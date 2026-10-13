@@ -1,0 +1,8 @@
+services:
+  doc-watermark:
+    build: .
+    image: doc-watermark
+    container_name: doc-watermark
+    ports:
+      - "8090:8080"
+    restart: unless-stopped

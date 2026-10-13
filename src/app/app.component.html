@@ -1,0 +1,169 @@
+<header>
+  <h1>Document Watermark</h1>
+  <p class="sub">Crop, rotate and watermark Aadhaar, PAN or any image / PDF. Files are processed in your browser and never uploaded.</p>
+</header>
+
+<main>
+  <section class="panel controls">
+    @if (!original()) {
+      <label
+        class="drop"
+        [class.over]="dragging()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="dragging.set(false)"
+        (drop)="onDrop($event)"
+      >
+        <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf,.pdf" (change)="onFileInput($event)" hidden />
+        <strong>Click to choose a file</strong>
+        <span>or drag &amp; drop here</span>
+        <small>JPG, PNG, WEBP or PDF</small>
+      </label>
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+    } @else {
+      <div class="file">
+        <span class="name" [title]="original()!.name">{{ original()!.name }}</span>
+        <button type="button" class="link" (click)="clear()">Change</button>
+      </div>
+
+      <nav class="tabs">
+        <button
+          type="button"
+          [class.active]="tab() === 'crop'"
+          [disabled]="fileIsPdf()"
+          [title]="fileIsPdf() ? 'Crop works on images only' : ''"
+          (click)="selectTab('crop')"
+        >
+          Crop
+        </button>
+        <button type="button" [class.active]="tab() === 'rotate'" (click)="selectTab('rotate')">Rotate</button>
+        <button type="button" [class.active]="tab() === 'watermark'" (click)="selectTab('watermark')">Watermark</button>
+      </nav>
+
+      @switch (tab()) {
+        @case ('crop') {
+          <p class="step">Drag the box or its corners to fit the card, then apply.</p>
+          <div class="row buttons">
+            <button type="button" class="secondary" (click)="cropper()?.reset()">Select all</button>
+            <button type="button" class="primary" [disabled]="busy()" (click)="applyCrop()">Apply crop</button>
+          </div>
+        }
+        @case ('rotate') {
+          <p class="step">Each click rotates the {{ fileIsPdf() ? 'PDF pages' : 'image' }} right away.</p>
+          <div class="row buttons">
+            <button type="button" class="secondary" [disabled]="busy()" (click)="rotate(-90)">⟲ Left</button>
+            <button type="button" class="secondary" [disabled]="busy()" (click)="rotate(90)">Right ⟳</button>
+            <button type="button" class="secondary" [disabled]="busy()" (click)="rotate(180)">180°</button>
+          </div>
+        }
+        @case ('watermark') {
+          <label class="field">
+            <span>Watermark text</span>
+            <input type="text" [(ngModel)]="text" (ngModelChange)="changed()" maxlength="80" />
+          </label>
+
+          <label class="check">
+            <input type="checkbox" [(ngModel)]="addDate" (ngModelChange)="changed()" />
+            Add today's date on a second line
+          </label>
+
+          <label class="check">
+            <input type="checkbox" [(ngModel)]="tiled" (ngModelChange)="changed()" />
+            Repeat across the whole page
+          </label>
+
+          <div class="row">
+            <label class="field color">
+              <span>Color</span>
+              <input type="color" [(ngModel)]="color" (ngModelChange)="changed()" />
+            </label>
+            <label class="field grow">
+              <span>Opacity <em>{{ opacity }}%</em></span>
+              <input type="range" min="10" max="90" [(ngModel)]="opacity" (ngModelChange)="changed()" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Text size <em>{{ sizePercent }}</em></span>
+            <input type="range" min="2" max="20" step="0.5" [(ngModel)]="sizePercent" (ngModelChange)="changed()" />
+          </label>
+
+          <label class="field">
+            <span>Angle <em>{{ angle }}°</em></span>
+            <input type="range" min="-90" max="90" [(ngModel)]="angle" (ngModelChange)="changed()" />
+          </label>
+
+          @if (!fileIsPdf()) {
+            <label class="check">
+              <input type="checkbox" [(ngModel)]="imageAsPdf" (ngModelChange)="changed()" />
+              Download the image as a PDF
+            </label>
+          }
+        }
+      }
+
+      @if (error()) {
+        <p class="error">{{ error() }}</p>
+      }
+
+      @if (tab() === 'watermark') {
+        <a
+          class="download"
+          [class.disabled]="!result() || busy()"
+          [attr.href]="result()?.url"
+          [attr.download]="result()?.name"
+        >
+          {{ busy() ? 'Working…' : 'Download with watermark' }}
+        </a>
+        @if (result(); as r) {
+          <small class="hint">{{ r.name }}</small>
+        }
+      } @else {
+        <button type="button" class="secondary" [disabled]="busy() || !editCount()" (click)="downloadEdited()">
+          Download without watermark
+        </button>
+      }
+
+      @if (editCount()) {
+        <button type="button" class="link center" (click)="undoAll()">
+          Undo all crop / rotate changes ({{ editCount() }})
+        </button>
+      }
+    }
+  </section>
+
+  <section class="panel preview">
+    @if (!edited()) {
+      <p class="empty">The preview shows up here</p>
+    } @else {
+      @switch (tab()) {
+        @case ('crop') {
+          <app-image-cropper [file]="edited()!" />
+        }
+        @case ('rotate') {
+          @if (editedPreview(); as p) {
+            @if (p.pdfUrl) {
+              <iframe [src]="p.pdfUrl" title="PDF preview"></iframe>
+            } @else {
+              <img [src]="p.url" alt="Image preview" />
+            }
+          }
+        }
+        @case ('watermark') {
+          @if (result(); as r) {
+            @if (r.pdfUrl) {
+              <iframe [src]="r.pdfUrl" title="Watermarked PDF preview"></iframe>
+            } @else {
+              <img [src]="r.url" alt="Watermarked preview" />
+            }
+          } @else {
+            <p class="empty">{{ busy() ? 'Working…' : 'Enter watermark text to see the preview' }}</p>
+          }
+        }
+      }
+    }
+  </section>
+</main>
+
+<footer>Check that the name, number and photo are still readable before you submit.</footer>
