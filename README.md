@@ -1,7 +1,12 @@
-# Document Watermark
+# Document Tools
 
-Upload an image (JPG/PNG/WEBP) or PDF, then crop, rotate and stamp a watermark like
-"FOR MCA REGISTRATION ONLY" on it, preview it, and download it.
+- **Watermark** — upload an image (JPG/PNG/WEBP) or PDF, then crop, rotate and
+  stamp a watermark on it, preview it, and download it.
+- **Combine images** — stack several images top to bottom (drag to reorder) into
+  one image or a one-page PDF.
+- **Images to PDF** — one PDF page per image, sized to the image or A4.
+
+A combined result can be sent straight to the watermark tool.
 
 All processing happens in the browser (canvas for images, pdf-lib for PDFs) —
 files are never sent to the server.

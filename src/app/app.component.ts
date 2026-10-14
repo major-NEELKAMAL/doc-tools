@@ -1,27 +1,22 @@
 import { Component, OnDestroy, WritableSignal, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { DomSanitizer } from '@angular/platform-browser';
+import { CombineMode, ImageCombineComponent } from './image-combine.component';
 import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
+import { Preview, replacePreview } from './preview';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
+type Tool = 'watermark' | CombineMode;
 type Tab = 'crop' | 'rotate' | 'watermark';
-
-/** A blob shown in the preview: object URL plus, for PDFs, the iframe-safe URL. */
-interface Preview {
-  url: string;
-  pdfUrl: SafeResourceUrl | null;
-  name: string;
-}
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule, ImageCropperComponent],
+  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent],
   templateUrl: './app.component.html',
-  styleUrl: './app.component.css',
 })
 export class AppComponent implements OnDestroy {
   private readonly watermarker = inject(WatermarkService);
@@ -29,7 +24,7 @@ export class AppComponent implements OnDestroy {
   readonly cropper = viewChild(ImageCropperComponent);
 
   // Watermark settings
-  text = 'FOR MCA REGISTRATION ONLY';
+  text = 'Add watermark';
   addDate = true;
   color = '#d00000';
   opacity = 35;
@@ -39,6 +34,8 @@ export class AppComponent implements OnDestroy {
   imageAsPdf = false;
 
   // State
+  readonly tool = signal<Tool>('watermark');
+  readonly combineMode = signal<CombineMode>('combine');
   readonly tab = signal<Tab>('crop');
   /** The file as uploaded. */
   readonly original = signal<File | null>(null);
@@ -70,6 +67,17 @@ export class AppComponent implements OnDestroy {
   onDragOver(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(true);
+  }
+
+  selectTool(tool: Tool): void {
+    this.tool.set(tool);
+    if (tool !== 'watermark') this.combineMode.set(tool);
+  }
+
+  /** Opens a combined image / PDF in the watermark tool. */
+  openInWatermark(file: File): void {
+    this.tool.set('watermark');
+    this.setFile(file);
   }
 
   clear(): void {
@@ -207,15 +215,7 @@ export class AppComponent implements OnDestroy {
   }
 
   private replacePreview(target: WritableSignal<Preview | null>, blob: Blob | null, name: string): void {
-    const old = target();
-    if (old) URL.revokeObjectURL(old.url);
-    if (!blob) {
-      target.set(null);
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const pdf = blob.type === 'application/pdf';
-    target.set({ url, name, pdfUrl: pdf ? this.sanitizer.bypassSecurityTrustResourceUrl(url) : null });
+    replacePreview(this.sanitizer, target, blob, name);
   }
 }
 
