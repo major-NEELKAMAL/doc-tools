@@ -1,9 +1,21 @@
 <header>
-  <h1>Document Watermark</h1>
-  <p class="sub">Crop, rotate and watermark Aadhaar, PAN or any image / PDF. Files are processed in your browser and never uploaded.</p>
+  <h1>Document Tools</h1>
+  <p class="sub">
+    Watermark, crop and rotate Aadhaar, PAN or any image / PDF, combine images, or turn images into a PDF. Files are
+    processed in your browser and never uploaded.
+  </p>
+  <nav class="tabs tools">
+    <button type="button" [class.active]="tool() === 'watermark'" (click)="selectTool('watermark')">Watermark</button>
+    <button type="button" [class.active]="tool() === 'combine'" (click)="selectTool('combine')">Combine images</button>
+    <button type="button" [class.active]="tool() === 'pdf'" (click)="selectTool('pdf')">Images to PDF</button>
+  </nav>
 </header>
 
-<main>
+<!-- Both tools stay mounted, so switching tools keeps each one's files and settings. -->
+<main [hidden]="tool() === 'watermark'">
+  <app-image-combine [mode]="combineMode()" (watermark)="openInWatermark($event)" />
+</main>
+<main [hidden]="tool() !== 'watermark'">
   <section class="panel controls">
     @if (!original()) {
       <label
