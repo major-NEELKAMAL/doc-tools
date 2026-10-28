@@ -18,7 +18,7 @@ export function downloadType(original: File): 'image/png' | 'image/jpeg' {
   return original.type === 'image/png' ? 'image/png' : 'image/jpeg';
 }
 
-export async function loadCanvas(file: File): Promise<HTMLCanvasElement> {
+export async function loadCanvas(file: Blob): Promise<HTMLCanvasElement> {
   const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
   const c = document.createElement('canvas');
   c.width = bitmap.width;

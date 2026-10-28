@@ -5,12 +5,13 @@ import { CombineMode, ImageCombineComponent } from './image-combine.component';
 import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
 import { Preview, replacePreview } from './preview';
+import { ResizeResult, ResizeType, imageSize, resizeImage } from './resize';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 type Tool = 'watermark' | CombineMode;
-type Tab = 'crop' | 'rotate' | 'watermark';
+type Tab = 'crop' | 'rotate' | 'resize' | 'watermark';
 
 @Component({
   selector: 'app-root',
@@ -33,6 +34,16 @@ export class AppComponent implements OnDestroy {
   tiled = true;
   imageAsPdf = false;
 
+  // Resize settings
+  resizeWidth: number | null = null;
+  resizeHeight: number | null = null;
+  keepAspect = true;
+  maxKb: number | null = null;
+  resizeType: ResizeType = 'image/jpeg';
+  resizeWithWatermark = false;
+  readonly kbPresets = [20, 50, 100, 200, 500];
+  readonly formatBytes = formatBytes;
+
   // State
   readonly tool = signal<Tool>('watermark');
   readonly combineMode = signal<CombineMode>('combine');
@@ -48,9 +59,15 @@ export class AppComponent implements OnDestroy {
   readonly dragging = signal(false);
   readonly editedPreview = signal<Preview | null>(null);
   readonly result = signal<Preview | null>(null);
+  /** Pixel size of the edited image (null for a PDF). */
+  readonly editedSize = signal<{ width: number; height: number } | null>(null);
+  readonly resized = signal<Preview | null>(null);
+  readonly resizeInfo = signal<ResizeResult | null>(null);
 
   private debounce?: ReturnType<typeof setTimeout>;
+  private resizeDebounce?: ReturnType<typeof setTimeout>;
   private run = 0;
+  private resizeRun = 0;
 
   onFileInput(event: Event): void {
     const input = event.target as HTMLInputElement;
@@ -89,10 +106,12 @@ export class AppComponent implements OnDestroy {
   }
 
   selectTab(tab: Tab): void {
-    if (tab === 'crop' && this.fileIsPdf()) return;
+    if ((tab === 'crop' || tab === 'resize') && this.fileIsPdf()) return;
     this.error.set('');
     this.tab.set(tab);
     if (tab === 'watermark' && !this.result()) this.render();
+    // Always re-render: the watermark settings may have changed since.
+    if (tab === 'resize') this.renderResize();
   }
 
   async applyCrop(): Promise<void> {
@@ -128,8 +147,37 @@ export class AppComponent implements OnDestroy {
     this.debounce = setTimeout(() => this.render(), 250);
   }
 
+  /** Width edited — with the aspect ratio locked, the height follows. */
+  widthChanged(): void {
+    const size = this.editedSize();
+    if (this.keepAspect && size) {
+      this.resizeHeight = this.resizeWidth ? Math.max(1, Math.round((this.resizeWidth * size.height) / size.width)) : null;
+    }
+    this.resizeChanged();
+  }
+
+  heightChanged(): void {
+    const size = this.editedSize();
+    if (this.keepAspect && size) {
+      this.resizeWidth = this.resizeHeight ? Math.max(1, Math.round((this.resizeHeight * size.width) / size.height)) : null;
+    }
+    this.resizeChanged();
+  }
+
+  setMaxKb(kb: number | null): void {
+    this.maxKb = kb;
+    this.resizeChanged();
+  }
+
+  /** Called on every resize settings change — re-renders shortly after. */
+  resizeChanged(): void {
+    clearTimeout(this.resizeDebounce);
+    this.resizeDebounce = setTimeout(() => this.renderResize(), 300);
+  }
+
   ngOnDestroy(): void {
     clearTimeout(this.debounce);
+    clearTimeout(this.resizeDebounce);
     this.setEdited(null);
   }
 
@@ -170,25 +218,27 @@ export class AppComponent implements OnDestroy {
     this.edited.set(file);
     this.replacePreview(this.editedPreview, file, file?.name ?? '');
     this.replacePreview(this.result, null, '');
+    this.resizeRun++;
+    this.replacePreview(this.resized, null, '');
+    this.resizeInfo.set(null);
+    this.editedSize.set(null);
+    if (file && !isPdf(file)) {
+      imageSize(file).then(
+        (size) => this.edited() === file && this.editedSize.set(size),
+        () => undefined,
+      );
+    }
   }
 
   private async render(): Promise<void> {
     const file = this.edited();
     const original = this.original();
     if (!file || !original) return;
-    const lines = [this.text.trim(), this.addDate ? todayDdMmYyyy() : ''].filter(Boolean);
-    if (!lines.length) {
+    const opts = this.watermarkOptions();
+    if (!opts) {
       this.replacePreview(this.result, null, '');
       return;
     }
-    const opts: WatermarkOptions = {
-      lines,
-      color: this.color,
-      opacity: this.opacity / 100,
-      sizePercent: this.sizePercent,
-      angle: this.angle,
-      tiled: this.tiled,
-    };
     const run = ++this.run;
     this.busy.set(true);
     try {
@@ -214,6 +264,59 @@ export class AppComponent implements OnDestroy {
     }
   }
 
+  /** The current watermark settings, or null when there is no text to stamp. */
+  private watermarkOptions(): WatermarkOptions | null {
+    const lines = [this.text.trim(), this.addDate ? todayDdMmYyyy() : ''].filter(Boolean);
+    if (!lines.length) return null;
+    return {
+      lines,
+      color: this.color,
+      opacity: this.opacity / 100,
+      sizePercent: this.sizePercent,
+      angle: this.angle,
+      tiled: this.tiled,
+    };
+  }
+
+  private async renderResize(): Promise<void> {
+    let file: Blob | null = this.edited();
+    const original = this.original();
+    if (!file || !original || this.fileIsPdf()) return;
+    const run = ++this.resizeRun;
+    this.busy.set(true);
+    try {
+      const wm = this.resizeWithWatermark ? this.watermarkOptions() : null;
+      if (wm) {
+        file = (
+          await this.watermarker.watermark(this.edited()!, wm, {
+            baseName: baseName(original),
+            imageType: 'image/png',
+            imageAsPdf: false,
+          })
+        ).blob;
+      }
+      const out = await resizeImage(file, {
+        width: this.resizeWidth,
+        height: this.resizeHeight,
+        maxKb: this.maxKb,
+        type: this.resizeType,
+      });
+      if (run !== this.resizeRun) return;
+      this.error.set('');
+      const ext = { 'image/png': '.png', 'image/webp': '.webp' }[out.blob.type] ?? '.jpg';
+      this.resizeInfo.set(out);
+      this.replacePreview(this.resized, out.blob, baseName(original) + '_resized' + ext);
+    } catch (e) {
+      if (run !== this.resizeRun) return;
+      console.error(e);
+      this.resizeInfo.set(null);
+      this.replacePreview(this.resized, null, '');
+      this.error.set('Could not resize this image.');
+    } finally {
+      if (run === this.resizeRun) this.busy.set(false);
+    }
+  }
+
   private replacePreview(target: WritableSignal<Preview | null>, blob: Blob | null, name: string): void {
     replacePreview(this.sanitizer, target, blob, name);
   }
@@ -226,6 +329,12 @@ function saveBlob(blob: Blob, name: string): void {
   a.download = name;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + ' KB';
+  return (n / 1024 / 1024).toFixed(2) + ' MB';
 }
 
 function todayDdMmYyyy(): string {
