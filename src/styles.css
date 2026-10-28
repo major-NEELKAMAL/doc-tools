@@ -34,6 +34,10 @@ main {
   flex: 1;
 }
 
+main.wide {
+  display: block;
+}
+
 @media (max-width: 800px) {
   main {
     grid-template-columns: 1fr;
@@ -306,7 +310,7 @@ button:disabled {
 }
 
 .tools {
-  max-width: 520px;
+  max-width: 680px;
   margin-top: 14px;
 }
 

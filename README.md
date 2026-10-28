@@ -6,6 +6,8 @@
 - **Combine images** — stack several images top to bottom (drag to reorder) into
   one image or a one-page PDF.
 - **Images to PDF** — one PDF page per image, sized to the image or A4.
+- **Text compare** — paste or upload two texts and see the line diff, side by
+  side or unified (ngx-diff). text-compare.risegap.com opens on this tool.
 
 A combined result can be sent straight to the watermark tool.
 
@@ -22,11 +24,12 @@ files are never sent to the server.
     npm install
     npx ng serve                     # http://localhost:4200
 
-## Deploy (https://crop.risegap.com)
+## Deploy (https://crop.risegap.com, https://text-compare.risegap.com)
 
 The `Jenkinsfile` ships the source to the test VM (same pipeline as
 risegap-admin), builds the image there and runs it on `127.0.0.1:8082`. The
 VM's host nginx terminates HTTPS on 443 with the Cloudflare Origin Certificate
-(`*.risegap.com`) and routes `crop.risegap.com` to that port (config:
-`deploy/nginx-risegap.conf` in the risegap-api repo). Cloudflare:
-`crop.risegap.com` proxied, A record -> the test VM.
+(`*.risegap.com`) and routes `crop.risegap.com` and `text-compare.risegap.com`
+to that port (config: `deploy/nginx-risegap.conf` in the risegap-api repo).
+Cloudflare: both proxied, pointing at the test VM. The internal names
+(container, image, Angular project) are still `doc-watermark`.
