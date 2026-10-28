@@ -1,9 +1,17 @@
-<header>
-  <h1>Document Tools</h1>
-  <p class="sub">
-    Watermark, crop, rotate and resize Aadhaar, PAN or any image / PDF (to 20 KB, 100 KB or any pixel size), combine
-    images, turn images into a PDF, or compare two texts. Files are processed in your browser and never uploaded.
-  </p>
+@if (showLanding) {
+  <app-landing (open)="openTool($event)" />
+}
+
+<header id="tools">
+  @if (showLanding) {
+    <h2 class="tools-title">Tools</h2>
+  } @else {
+    <h1>Document Tools</h1>
+    <p class="sub">
+      Watermark, crop, rotate and resize Aadhaar, PAN or any image / PDF (to 20 KB, 100 KB or any pixel size), combine
+      images, turn images into a PDF, or compare two texts. Files are processed in your browser and never uploaded.
+    </p>
+  }
   <nav class="tabs tools">
     <button type="button" [class.active]="tool() === 'watermark'" (click)="selectTool('watermark')">Crop / Watermark</button>
     <button type="button" [class.active]="tool() === 'combine'" (click)="selectTool('combine')">Combine images</button>

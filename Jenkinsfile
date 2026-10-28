@@ -1,7 +1,8 @@
 // Document tools (crop / resize / watermark, combine images, images to PDF,
 // text compare) -> TEST server (Oracle Cloud VM, arm64), served at
-// https://crop.risegap.com and https://text-compare.risegap.com (same app; the
-// text-compare host opens on the text compare tool).
+// https://cropresizecompare.risegap.com (landing page + tools; the indexed
+// host), plus https://crop.risegap.com and https://text-compare.risegap.com
+// (same app, no landing; the text-compare host opens on the text compare tool).
 // Same pipeline as risegap-admin.
 //
 // Jenkins only ships the source: the image (incl. the Angular build in the
@@ -31,7 +32,7 @@ pipeline {
     SRC_TAR = "doc-watermark-src.tar.gz"
     BUILD_DIR = "/home/ubuntu/build/doc-watermark"
     PORT = "8082"
-    PUBLIC_URL = "https://crop.risegap.com"
+    PUBLIC_URL = "https://cropresizecompare.risegap.com"
   }
 
   stages {
@@ -100,7 +101,7 @@ EOF
               // From outside, straight to the VM's 443 (Cloudflare challenges
               // this AWS IP; -k: Origin CA cert): covers the host nginx
               // server block of each host.
-              for (host in ['crop.risegap.com', 'text-compare.risegap.com']) {
+              for (host in ['cropresizecompare.risegap.com', 'crop.risegap.com', 'text-compare.risegap.com']) {
                 def status = sh(script: "curl -sk --max-time 10 --resolve ${host}:443:${REMOTE_IP} -o /dev/null -w '%{http_code}' https://${host}/healthz || echo failed", returnStdout: true).trim()
                 if (status != '200') {
                   unstable "https://${host} not served by ${REMOTE_IP}:443 (HTTP ${status}) - check the host nginx ${host} server block"

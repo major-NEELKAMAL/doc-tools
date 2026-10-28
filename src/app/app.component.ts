@@ -6,6 +6,7 @@ import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
 import { Preview, replacePreview } from './preview';
 import { ResizeResult, ResizeType, imageSize, resizeImage } from './resize';
+import { LandingComponent } from './landing.component';
 import { TextCompareComponent } from './text-compare.component';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
 
@@ -17,7 +18,7 @@ type Tab = 'crop' | 'rotate' | 'resize' | 'watermark';
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent, TextCompareComponent],
+  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent, LandingComponent, TextCompareComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnDestroy {
@@ -46,6 +47,8 @@ export class AppComponent implements OnDestroy {
   readonly formatBytes = formatBytes;
 
   // State
+  /** crop. and text-compare. go straight to their tool; every other host shows the landing page first. */
+  readonly showLanding = !/^(crop|text-compare)\./.test(location.hostname);
   /** text-compare.risegap.com opens straight on the text compare tool. */
   readonly tool = signal<Tool>(location.hostname.startsWith('text-compare.') ? 'text' : 'watermark');
   readonly combineMode = signal<CombineMode>('combine');
@@ -91,6 +94,12 @@ export class AppComponent implements OnDestroy {
   selectTool(tool: Tool): void {
     this.tool.set(tool);
     if (tool === 'combine' || tool === 'pdf') this.combineMode.set(tool);
+  }
+
+  /** A landing card was clicked: switch to its tool and scroll to it. */
+  openTool(tool: Tool): void {
+    this.selectTool(tool);
+    document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth' });
   }
 
   /** Opens a combined image / PDF in the watermark tool. */
