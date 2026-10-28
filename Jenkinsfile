@@ -1,5 +1,7 @@
-// Document watermark tool (crop / rotate / watermark) -> TEST server (Oracle
-// Cloud VM, arm64), served at https://crop.risegap.com.
+// Document tools (crop / resize / watermark, combine images, images to PDF,
+// text compare) -> TEST server (Oracle Cloud VM, arm64), served at
+// https://crop.risegap.com and https://text-compare.risegap.com (same app; the
+// text-compare host opens on the text compare tool).
 // Same pipeline as risegap-admin.
 //
 // Jenkins only ships the source: the image (incl. the Angular build in the
@@ -7,7 +9,7 @@
 // has plenty of RAM - the Jenkins box (1.8 GB, no swap) got OOM-killed
 // running `ng build` itself. Then `docker run`, published on 127.0.0.1:8082
 // only. The VM's host nginx terminates HTTPS on 443 and routes
-// crop.risegap.com there (risegap-api repo: deploy/nginx-risegap.conf).
+// both hosts there (risegap-api repo: deploy/nginx-risegap.conf).
 //
 // Jenkins credentials: test-server-ssh-key (SSH, user ubuntu) and
 // test-server-ip (Secret text: the VM's IP). The repo is public and Cloudflare
@@ -91,16 +93,18 @@ EOF
                   sleep 5
                   def status = sh(script: "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 ${SSH_USER}@${REMOTE_IP} \"curl -s --max-time 10 -o /dev/null -w '%{http_code}' http://127.0.0.1:${PORT}/healthz\" || echo failed", returnStdout: true).trim()
                   if (status != '200') {
-                    error "Watermark tool not healthy on the VM (HTTP ${status}). Check: docker logs ${APP_NAME}"
+                    error "Document tools not healthy on the VM (HTTP ${status}). Check: docker logs ${APP_NAME}"
                   }
                 }
               }
               // From outside, straight to the VM's 443 (Cloudflare challenges
               // this AWS IP; -k: Origin CA cert): covers the host nginx
-              // crop.risegap.com server block.
-              def status = sh(script: "curl -sk --max-time 10 --resolve crop.risegap.com:443:${REMOTE_IP} -o /dev/null -w '%{http_code}' https://crop.risegap.com/healthz || echo failed", returnStdout: true).trim()
-              if (status != '200') {
-                unstable "https://crop.risegap.com not served by ${REMOTE_IP}:443 (HTTP ${status}) - check the host nginx crop.risegap.com server block"
+              // server block of each host.
+              for (host in ['crop.risegap.com', 'text-compare.risegap.com']) {
+                def status = sh(script: "curl -sk --max-time 10 --resolve ${host}:443:${REMOTE_IP} -o /dev/null -w '%{http_code}' https://${host}/healthz || echo failed", returnStdout: true).trim()
+                if (status != '200') {
+                  unstable "https://${host} not served by ${REMOTE_IP}:443 (HTTP ${status}) - check the host nginx ${host} server block"
+                }
               }
             }
           }
@@ -110,7 +114,7 @@ EOF
   }
 
   post {
-    failure { echo "Watermark tool deployment failed!" }
-    success { echo "Watermark tool deployed: ${env.PUBLIC_URL}" }
+    failure { echo "Document tools deployment failed!" }
+    success { echo "Document tools deployed: ${env.PUBLIC_URL} and https://text-compare.risegap.com" }
   }
 }

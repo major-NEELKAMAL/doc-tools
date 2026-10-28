@@ -6,17 +6,18 @@ import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
 import { Preview, replacePreview } from './preview';
 import { ResizeResult, ResizeType, imageSize, resizeImage } from './resize';
+import { TextCompareComponent } from './text-compare.component';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
-type Tool = 'watermark' | CombineMode;
+type Tool = 'watermark' | CombineMode | 'text';
 type Tab = 'crop' | 'rotate' | 'resize' | 'watermark';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent],
+  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent, TextCompareComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnDestroy {
@@ -45,7 +46,8 @@ export class AppComponent implements OnDestroy {
   readonly formatBytes = formatBytes;
 
   // State
-  readonly tool = signal<Tool>('watermark');
+  /** text-compare.risegap.com opens straight on the text compare tool. */
+  readonly tool = signal<Tool>(location.hostname.startsWith('text-compare.') ? 'text' : 'watermark');
   readonly combineMode = signal<CombineMode>('combine');
   readonly tab = signal<Tab>('crop');
   /** The file as uploaded. */
@@ -88,7 +90,7 @@ export class AppComponent implements OnDestroy {
 
   selectTool(tool: Tool): void {
     this.tool.set(tool);
-    if (tool !== 'watermark') this.combineMode.set(tool);
+    if (tool === 'combine' || tool === 'pdf') this.combineMode.set(tool);
   }
 
   /** Opens a combined image / PDF in the watermark tool. */
