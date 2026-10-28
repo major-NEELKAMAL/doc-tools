@@ -16,7 +16,7 @@ interface Faq {
 }
 
 /**
- * Landing content above the tools on the main host: what the tools do, why
+ * Landing content above the tools: what the tools do, why
  * they are safe, and an FAQ. Keep the FAQ in sync with the FAQPage JSON-LD in
  * index.html — Google wants the structured data to match the visible text.
  */

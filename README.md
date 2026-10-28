@@ -7,7 +7,7 @@
   one image or a one-page PDF.
 - **Images to PDF** — one PDF page per image, sized to the image or A4.
 - **Text compare** — paste or upload two texts and see the line diff, side by
-  side or unified (ngx-diff). text-compare.risegap.com opens on this tool.
+  side or unified (ngx-diff).
 
 A combined result can be sent straight to the watermark tool.
 
@@ -29,9 +29,8 @@ files are never sent to the server.
 The `Jenkinsfile` ships the source to the test VM (same pipeline as
 risegap-admin), builds the image there and runs it on `127.0.0.1:8082`. The
 VM's host nginx terminates HTTPS on 443 with the Cloudflare Origin Certificate
-(`*.risegap.com`) and routes `cropresizecompare.risegap.com`,
-`crop.risegap.com` and `text-compare.risegap.com` to that port (config: `deploy/nginx-risegap.conf` in the risegap-api repo).
-`cropresizecompare.risegap.com` is the main host: it shows the landing page
-and is the canonical URL in `index.html`, `robots.txt` and `sitemap.xml`.
-Cloudflare: all three proxied, pointing at the test VM. The internal names
+(`*.risegap.com`) and routes `cropresizecompare.risegap.com` to that port
+(config: `deploy/nginx-risegap.conf` in the risegap-api repo). That host is
+also the canonical URL in `index.html`, `robots.txt` and `sitemap.xml`.
+Cloudflare: proxied, pointing at the test VM. The internal names
 (container, image, Angular project) are still `doc-watermark`.

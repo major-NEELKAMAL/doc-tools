@@ -47,10 +47,7 @@ export class AppComponent implements OnDestroy {
   readonly formatBytes = formatBytes;
 
   // State
-  /** crop. and text-compare. go straight to their tool; every other host shows the landing page first. */
-  readonly showLanding = !/^(crop|text-compare)\./.test(location.hostname);
-  /** text-compare.risegap.com opens straight on the text compare tool. */
-  readonly tool = signal<Tool>(location.hostname.startsWith('text-compare.') ? 'text' : 'watermark');
+  readonly tool = signal<Tool>('watermark');
   readonly combineMode = signal<CombineMode>('combine');
   readonly tab = signal<Tab>('crop');
   /** The file as uploaded. */
