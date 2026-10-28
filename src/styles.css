@@ -121,7 +121,9 @@ main {
   color: #6b7280;
 }
 
-.field input[type='text'] {
+.field input[type='text'],
+.field input[type='number'],
+.field select {
   padding: 9px 10px;
   border: 1px solid #cfd5dc;
   border-radius: 8px;
@@ -144,6 +146,25 @@ main {
 
 .grow {
   flex: 1;
+  min-width: 0;
+}
+
+.times {
+  padding-bottom: 9px;
+  color: #6b7280;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -6px;
+}
+
+.chips .secondary.active {
+  border-color: #2563eb;
+  background: #f3f7ff;
+  color: #2563eb;
 }
 
 .color input {

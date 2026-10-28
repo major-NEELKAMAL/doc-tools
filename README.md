@@ -1,7 +1,8 @@
 # Document Tools
 
-- **Watermark** — upload an image (JPG/PNG/WEBP) or PDF, then crop, rotate and
-  stamp a watermark on it, preview it, and download it.
+- **Crop / Watermark** — upload an image (JPG/PNG/WEBP) or PDF, then crop, rotate and
+  stamp a watermark on it, preview it, and download it. Images can also be
+  resized to a pixel size and/or squeezed under a file size (e.g. 20 KB, 100 KB).
 - **Combine images** — stack several images top to bottom (drag to reorder) into
   one image or a one-page PDF.
 - **Images to PDF** — one PDF page per image, sized to the image or A4.
