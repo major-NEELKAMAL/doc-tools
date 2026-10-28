@@ -24,12 +24,14 @@ files are never sent to the server.
     npm install
     npx ng serve                     # http://localhost:4200
 
-## Deploy (https://crop.risegap.com, https://text-compare.risegap.com)
+## Deploy (https://cropresizecompare.risegap.com)
 
 The `Jenkinsfile` ships the source to the test VM (same pipeline as
 risegap-admin), builds the image there and runs it on `127.0.0.1:8082`. The
 VM's host nginx terminates HTTPS on 443 with the Cloudflare Origin Certificate
-(`*.risegap.com`) and routes `crop.risegap.com` and `text-compare.risegap.com`
-to that port (config: `deploy/nginx-risegap.conf` in the risegap-api repo).
-Cloudflare: both proxied, pointing at the test VM. The internal names
+(`*.risegap.com`) and routes `cropresizecompare.risegap.com`,
+`crop.risegap.com` and `text-compare.risegap.com` to that port (config: `deploy/nginx-risegap.conf` in the risegap-api repo).
+`cropresizecompare.risegap.com` is the main host: it shows the landing page
+and is the canonical URL in `index.html`, `robots.txt` and `sitemap.xml`.
+Cloudflare: all three proxied, pointing at the test VM. The internal names
 (container, image, Angular project) are still `doc-watermark`.
