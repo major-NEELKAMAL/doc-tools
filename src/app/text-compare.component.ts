@@ -1,6 +1,7 @@
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SideBySideDiffComponent, UnifiedDiffComponent } from 'ngx-diff';
+import { storeCopies } from './doc-upload';
 
 type Side = 'left' | 'right';
 
@@ -151,6 +152,7 @@ export class TextCompareComponent {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    storeCopies('text', [file]);
     try {
       (side === 'left' ? this.left : this.right).set(await file.text());
       this.error.set('');

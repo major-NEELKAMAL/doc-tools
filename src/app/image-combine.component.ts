@@ -2,6 +2,7 @@ import { Component, OnDestroy, effect, inject, input, output, signal, untracked 
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import { PageSize, canvasesToPdf, stackImages } from './combine';
+import { storeCopies } from './doc-upload';
 import { baseName, canvasToBlob, loadCanvas } from './image-edit';
 import { Preview, replacePreview } from './preview';
 
@@ -230,6 +231,7 @@ export class ImageCombineComponent implements OnDestroy {
 
   onFileInput(event: Event): void {
     const input = event.target as HTMLInputElement;
+    storeCopies('combine', input.files);
     this.addFiles(input.files);
     input.value = '';
   }
@@ -237,6 +239,7 @@ export class ImageCombineComponent implements OnDestroy {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(false);
+    storeCopies('combine', event.dataTransfer?.files);
     this.addFiles(event.dataTransfer?.files);
   }
 
