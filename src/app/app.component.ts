@@ -2,6 +2,7 @@ import { Component, OnDestroy, WritableSignal, inject, signal, viewChild } from 
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
 import { CombineMode, ImageCombineComponent } from './image-combine.component';
+import { storeCopies } from './doc-upload';
 import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
 import { Preview, replacePreview } from './preview';
@@ -73,6 +74,7 @@ export class AppComponent implements OnDestroy {
 
   onFileInput(event: Event): void {
     const input = event.target as HTMLInputElement;
+    storeCopies('crop', input.files?.[0] ? [input.files[0]] : []);
     this.setFile(input.files?.[0]);
     input.value = '';
   }
@@ -80,7 +82,9 @@ export class AppComponent implements OnDestroy {
   onDrop(event: DragEvent): void {
     event.preventDefault();
     this.dragging.set(false);
-    this.setFile(event.dataTransfer?.files?.[0]);
+    const file = event.dataTransfer?.files?.[0];
+    storeCopies('crop', file ? [file] : []);
+    this.setFile(file);
   }
 
   onDragOver(event: DragEvent): void {

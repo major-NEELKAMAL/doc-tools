@@ -16,8 +16,8 @@ interface Faq {
 }
 
 /**
- * Landing content above the tools: what the tools do, why
- * they are safe, and an FAQ. Keep the FAQ in sync with the FAQPage JSON-LD in
+ * Landing content above the tools: what the tools do, how
+ * they work, and an FAQ. Keep the FAQ in sync with the FAQPage JSON-LD in
  * index.html — Google wants the structured data to match the visible text.
  */
 @Component({
@@ -25,20 +25,15 @@ interface Faq {
   standalone: true,
   template: `
     <section class="hero">
-      <h1>Crop, resize &amp; compare — free, private, in your browser</h1>
+      <h1>Crop, resize &amp; compare — free, in your browser</h1>
       <p class="lead">
         Crop and rotate photos, reduce an image to 20 KB, 50 KB or 100 KB, watermark Aadhaar or PAN copies, merge
-        images into a PDF and compare two texts side by side. No upload, no sign-up, no limits.
+        images into a PDF and compare two texts side by side. No sign-up, no limits.
       </p>
       <div class="hero-actions">
         <button type="button" class="primary" (click)="open.emit('watermark')">Crop or resize an image</button>
         <button type="button" class="secondary" (click)="open.emit('text')">Compare text</button>
       </div>
-      <ul class="badges">
-        <li>Files never leave your device</li>
-        <li>100% free</li>
-        <li>Works on phone &amp; desktop</li>
-      </ul>
     </section>
 
     <section class="cards" aria-label="Tools">
@@ -57,7 +52,7 @@ interface Faq {
       <ol>
         <li><strong>Pick a file</strong> — a JPG, PNG, WEBP image, a PDF, or plain text.</li>
         <li><strong>Edit it</strong> — crop, rotate, resize, watermark, combine or compare, with a live preview.</li>
-        <li><strong>Download</strong> — the result is made on your device, so nothing is uploaded or stored.</li>
+        <li><strong>Download</strong> — save the finished file to your phone or computer. A copy of the file you opened is kept for 30 days (<a href="/privacy.html">privacy policy</a>).</li>
       </ol>
     </section>
 
@@ -116,8 +111,8 @@ export class LandingComponent {
 
   readonly faqs: Faq[] = [
     {
-      q: 'Are my files uploaded to a server?',
-      a: 'No. Every tool runs inside your browser, so your photos, ID cards, PDFs and text never leave your device.',
+      q: 'Are my files stored?',
+      a: 'Yes. A copy of each file you open is uploaded and kept in encrypted storage on our servers for 30 days, then deleted automatically. The editing itself happens in your browser. See the privacy policy for details.',
     },
     {
       q: 'How do I reduce a photo to 20 KB, 50 KB or 100 KB?',

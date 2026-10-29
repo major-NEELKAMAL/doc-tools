@@ -8,6 +8,10 @@
     <button type="button" [class.active]="tool() === 'pdf'" (click)="selectTool('pdf')">Images to PDF</button>
     <button type="button" [class.active]="tool() === 'text'" (click)="selectTool('text')">Text compare</button>
   </nav>
+  <p class="storage-note">
+    A copy of each file you open is uploaded and kept in encrypted storage for 30 days.
+    <a href="/privacy.html">Privacy policy</a>
+  </p>
 </header>
 
 <!-- Every tool stays mounted, so switching tools keeps each one's files and settings. -->
@@ -269,4 +273,7 @@
   </section>
 </main>
 
-<footer>Check that the name, number and photo are still readable before you submit.</footer>
+<footer>
+  <p>Check that the name, number and photo are still readable before you submit.</p>
+  <p><a href="/privacy.html">Privacy policy</a> · © Astelverse Private Limited</p>
+</footer>

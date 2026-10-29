@@ -314,23 +314,6 @@ main.wide {
   font-weight: 600;
 }
 
-.badges {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 18px;
-  margin: 20px 0 0;
-  padding: 0;
-  list-style: none;
-  color: #166534;
-  font-size: 0.9rem;
-}
-
-.badges li::before {
-  content: '✓ ';
-  font-weight: 700;
-}
-
 .cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -425,6 +408,18 @@ main.wide {
 }
 
 footer {
+  text-align: center;
+  color: #6b7280;
+  font-size: 0.85rem;
+}
+
+footer a,
+.storage-note a {
+  color: inherit;
+}
+
+.storage-note {
+  margin: 10px 0 0;
   text-align: center;
   color: #6b7280;
   font-size: 0.85rem;
