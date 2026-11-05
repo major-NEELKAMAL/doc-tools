@@ -1,7 +1,7 @@
-import { Component, OnDestroy, WritableSignal, inject, signal, viewChild } from '@angular/core';
+import { Component, OnDestroy, WritableSignal, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer } from '@angular/platform-browser';
-import { CombineMode, ImageCombineComponent } from './image-combine.component';
+import { CombineMode, ImageCombineComponent, SendTo } from './image-combine.component';
 import { storeCopies } from './doc-upload';
 import { ImageCropperComponent } from './image-cropper.component';
 import { baseName, downloadType, exportImage, isPdf, rotateFile } from './image-edit';
@@ -13,8 +13,17 @@ import { WatermarkOptions, WatermarkService } from './watermark.service';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
-type Tool = 'watermark' | CombineMode | 'text';
-type Tab = 'crop' | 'rotate' | 'resize' | 'watermark';
+export type ImageTool = 'crop' | 'resize' | 'watermark';
+export type Tool = ImageTool | CombineMode | 'text';
+
+/** Where the current image / result can be sent next. */
+const FORWARD_TARGETS: { id: ImageTool | CombineMode; label: string }[] = [
+  { id: 'crop', label: 'Crop' },
+  { id: 'resize', label: 'Resize' },
+  { id: 'watermark', label: 'Watermark' },
+  { id: 'combine', label: 'Combine' },
+  { id: 'pdf', label: 'Images to PDF' },
+];
 
 @Component({
   selector: 'app-root',
@@ -26,6 +35,7 @@ export class AppComponent implements OnDestroy {
   private readonly watermarker = inject(WatermarkService);
   private readonly sanitizer = inject(DomSanitizer);
   readonly cropper = viewChild(ImageCropperComponent);
+  readonly combiner = viewChild(ImageCombineComponent);
 
   // Watermark settings
   text = 'Add watermark';
@@ -43,14 +53,14 @@ export class AppComponent implements OnDestroy {
   keepAspect = true;
   maxKb: number | null = null;
   resizeType: ResizeType = 'image/jpeg';
-  resizeWithWatermark = false;
   readonly kbPresets = [20, 50, 100, 200, 500];
   readonly formatBytes = formatBytes;
 
   // State
-  readonly tool = signal<Tool>('watermark');
+  readonly tool = signal<Tool>('crop');
   readonly combineMode = signal<CombineMode>('combine');
-  readonly tab = signal<Tab>('crop');
+  readonly isImageTool = computed(() => ['crop', 'resize', 'watermark'].includes(this.tool()));
+  readonly forwardTargets = computed(() => FORWARD_TARGETS.filter((t) => t.id !== this.tool()));
   /** The file as uploaded. */
   readonly original = signal<File | null>(null);
   /** The original with every crop/rotation applied so far. */
@@ -95,6 +105,8 @@ export class AppComponent implements OnDestroy {
   selectTool(tool: Tool): void {
     this.tool.set(tool);
     if (tool === 'combine' || tool === 'pdf') this.combineMode.set(tool);
+    this.error.set('');
+    this.refresh();
   }
 
   /** A landing card was clicked: switch to its tool and scroll to it. */
@@ -103,10 +115,11 @@ export class AppComponent implements OnDestroy {
     document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth' });
   }
 
-  /** Opens a combined image / PDF in the watermark tool. */
-  openInWatermark(file: File): void {
-    this.tool.set('watermark');
-    this.setFile(file);
+  /** A combined image / PDF was sent to crop, resize or watermark. */
+  openFromCombine(send: SendTo): void {
+    this.tool.set(send.tool);
+    this.setFile(send.file);
+    this.scrollToTools();
   }
 
   clear(): void {
@@ -114,16 +127,47 @@ export class AppComponent implements OnDestroy {
     this.setEdited(null);
     this.editCount.set(0);
     this.error.set('');
-    this.tab.set('crop');
   }
 
-  selectTab(tab: Tab): void {
-    if ((tab === 'crop' || tab === 'resize') && this.fileIsPdf()) return;
-    this.error.set('');
-    this.tab.set(tab);
-    if (tab === 'watermark' && !this.result()) this.render();
-    // Always re-render: the watermark settings may have changed since.
-    if (tab === 'resize') this.renderResize();
+  /** The current tool's output: the cropped/rotated file, the resized or the watermarked result. */
+  outputBlob(): Blob | null {
+    switch (this.tool()) {
+      case 'crop':
+        return this.edited();
+      case 'resize':
+        return this.fileIsPdf() ? null : (this.resized()?.blob ?? null);
+      case 'watermark':
+        return this.result()?.blob ?? null;
+      default:
+        return null;
+    }
+  }
+
+  canForward(target: ImageTool | CombineMode): boolean {
+    const blob = this.outputBlob();
+    if (!blob || this.busy()) return false;
+    // Only the watermark tool takes PDFs.
+    return target === 'watermark' || blob.type !== 'application/pdf';
+  }
+
+  /** Sends the current output on to another tool, which then works on it. */
+  forward(target: ImageTool | CombineMode): void {
+    const from = this.tool();
+    const blob = this.outputBlob();
+    if (!blob || !this.canForward(target)) return;
+    const name = from === 'crop' ? this.edited()!.name : (from === 'resize' ? this.resized() : this.result())!.name;
+    const file = blob instanceof File ? blob : new File([blob], name, { type: blob.type });
+    if (target === 'combine' || target === 'pdf') {
+      this.combiner()?.add([file]);
+      this.selectTool(target);
+    } else if (from === 'crop') {
+      // Crop/rotate already edits the shared image — just switch (keeps "undo all").
+      this.selectTool(target);
+    } else {
+      this.tool.set(target);
+      this.setFile(file);
+    }
+    this.scrollToTools();
   }
 
   async applyCrop(): Promise<void> {
@@ -187,6 +231,17 @@ export class AppComponent implements OnDestroy {
     this.resizeDebounce = setTimeout(() => this.renderResize(), 300);
   }
 
+  private scrollToTools(): void {
+    document.getElementById('tools')?.scrollIntoView({ behavior: 'smooth' });
+  }
+
+  /** Renders the current tool's result if it is not there yet. */
+  private refresh(): void {
+    if (!this.edited()) return;
+    if (this.tool() === 'watermark' && !this.result()) this.render();
+    if (this.tool() === 'resize' && !this.fileIsPdf() && !this.resized()) this.renderResize();
+  }
+
   ngOnDestroy(): void {
     clearTimeout(this.debounce);
     clearTimeout(this.resizeDebounce);
@@ -204,8 +259,7 @@ export class AppComponent implements OnDestroy {
     this.fileIsPdf.set(isPdf(file));
     this.editCount.set(0);
     this.setEdited(file);
-    this.tab.set(this.fileIsPdf() ? 'watermark' : 'crop');
-    if (this.tab() === 'watermark') this.render();
+    this.refresh();
   }
 
   private async edit(op: () => Promise<File>, failure: string): Promise<void> {
@@ -291,22 +345,12 @@ export class AppComponent implements OnDestroy {
   }
 
   private async renderResize(): Promise<void> {
-    let file: Blob | null = this.edited();
+    const file = this.edited();
     const original = this.original();
     if (!file || !original || this.fileIsPdf()) return;
     const run = ++this.resizeRun;
     this.busy.set(true);
     try {
-      const wm = this.resizeWithWatermark ? this.watermarkOptions() : null;
-      if (wm) {
-        file = (
-          await this.watermarker.watermark(this.edited()!, wm, {
-            baseName: baseName(original),
-            imageType: 'image/png',
-            imageAsPdf: false,
-          })
-        ).blob;
-      }
       const out = await resizeImage(file, {
         width: this.resizeWidth,
         height: this.resizeHeight,

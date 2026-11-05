@@ -11,6 +11,12 @@ const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp'];
 /** 'combine' stacks the images top to bottom; 'pdf' makes one PDF page per image. */
 export type CombineMode = 'combine' | 'pdf';
 
+/** A result sent on to one of the single-image tools. */
+export interface SendTo {
+  tool: 'crop' | 'resize' | 'watermark';
+  file: File;
+}
+
 interface Item {
   id: number;
   file: File;
@@ -111,9 +117,16 @@ interface Item {
         </a>
         @if (result(); as r) {
           <small class="hint">{{ r.name }}</small>
-          <button type="button" class="secondary" [disabled]="busy()" (click)="sendToWatermark()">
-            Add a watermark to this
-          </button>
+          <div class="forward">
+            <span>Use this result in</span>
+            <div class="chips">
+              @if (!r.pdfUrl) {
+                <button type="button" class="secondary" [disabled]="busy()" (click)="sendTo('crop')">Crop →</button>
+                <button type="button" class="secondary" [disabled]="busy()" (click)="sendTo('resize')">Resize →</button>
+              }
+              <button type="button" class="secondary" [disabled]="busy()" (click)="sendTo('watermark')">Watermark →</button>
+            </div>
+          </div>
         }
       }
     </section>
@@ -199,8 +212,8 @@ export class ImageCombineComponent implements OnDestroy {
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly mode = input.required<CombineMode>();
-  /** The current result, to be opened in the watermark tool. */
-  readonly watermark = output<File>();
+  /** The current result, to be opened in the crop, resize or watermark tool. */
+  readonly send = output<SendTo>();
 
   // Settings
   output: 'image' | 'pdf' = 'image';
@@ -281,9 +294,14 @@ export class ImageCombineComponent implements OnDestroy {
     this.changed();
   }
 
-  sendToWatermark(): void {
+  sendTo(tool: SendTo['tool']): void {
     const r = this.result();
-    if (r) this.watermark.emit(new File([r.blob], r.name, { type: r.blob.type }));
+    if (r) this.send.emit({ tool, file: new File([r.blob], r.name, { type: r.blob.type }) });
+  }
+
+  /** Adds images sent over from another tool. */
+  add(files: File[]): void {
+    this.addFiles(files);
   }
 
   changed(): void {
@@ -300,7 +318,7 @@ export class ImageCombineComponent implements OnDestroy {
     replacePreview(this.sanitizer, this.result, null, '');
   }
 
-  private addFiles(list: FileList | null | undefined): void {
+  private addFiles(list: FileList | File[] | null | undefined): void {
     const files = Array.from(list ?? []);
     if (!files.length) return;
     const images = files.filter((f) => ACCEPTED.includes(f.type));

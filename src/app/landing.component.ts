@@ -1,7 +1,7 @@
 import { Component, output } from '@angular/core';
 
 /** The tools a landing card can open (same ids as AppComponent's Tool). */
-export type LandingTool = 'watermark' | 'combine' | 'pdf' | 'text';
+export type LandingTool = 'crop' | 'resize' | 'watermark' | 'combine' | 'pdf' | 'text';
 
 interface Card {
   tool: LandingTool;
@@ -31,7 +31,7 @@ interface Faq {
         images into a PDF and compare two texts side by side. No sign-up, no limits.
       </p>
       <div class="hero-actions">
-        <button type="button" class="primary" (click)="open.emit('watermark')">Crop or resize an image</button>
+        <button type="button" class="primary" (click)="open.emit('resize')">Resize an image</button>
         <button type="button" class="secondary" (click)="open.emit('text')">Compare text</button>
       </div>
     </section>
@@ -72,13 +72,13 @@ export class LandingComponent {
 
   readonly cards: Card[] = [
     {
-      tool: 'watermark',
+      tool: 'crop',
       icon: '✂️',
       title: 'Crop & rotate images',
       text: 'Cut a photo, ID card or document to exactly the area you need and straighten it.',
     },
     {
-      tool: 'watermark',
+      tool: 'resize',
       icon: '📉',
       title: 'Resize image to 20 KB, 50 KB, 100 KB',
       text: 'Shrink a photo or signature to a file size or pixel size for exam and job forms.',
@@ -116,11 +116,11 @@ export class LandingComponent {
     },
     {
       q: 'How do I reduce a photo to 20 KB, 50 KB or 100 KB?',
-      a: 'Open Crop / Watermark, choose your image, go to the Resize tab and pick a size such as 20 KB, 50 KB or 100 KB. The tool lowers the quality and, if needed, the pixel size until the file fits, then you download it.',
+      a: 'Open Resize, choose your image and pick a size such as 20 KB, 50 KB or 100 KB. The tool lowers the quality and, if needed, the pixel size until the file fits, then you download it.',
     },
     {
       q: 'Can I resize an image to exact pixels?',
-      a: 'Yes. In the Resize tab enter the width and height in pixels. Keep aspect ratio on to avoid stretching the image.',
+      a: 'Yes. Open Resize and enter the width and height in pixels. Keep aspect ratio on to avoid stretching the image.',
     },
     {
       q: 'Is it free?',
