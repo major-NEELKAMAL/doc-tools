@@ -3,7 +3,9 @@
 <header id="tools">
   <h2 class="tools-title">Tools</h2>
   <nav class="tabs tools">
-    <button type="button" [class.active]="tool() === 'watermark'" (click)="selectTool('watermark')">Crop / Watermark</button>
+    <button type="button" [class.active]="tool() === 'crop'" (click)="selectTool('crop')">Crop</button>
+    <button type="button" [class.active]="tool() === 'resize'" (click)="selectTool('resize')">Resize</button>
+    <button type="button" [class.active]="tool() === 'watermark'" (click)="selectTool('watermark')">Watermark</button>
     <button type="button" [class.active]="tool() === 'combine'" (click)="selectTool('combine')">Combine images</button>
     <button type="button" [class.active]="tool() === 'pdf'" (click)="selectTool('pdf')">Images to PDF</button>
     <button type="button" [class.active]="tool() === 'text'" (click)="selectTool('text')">Text compare</button>
@@ -19,9 +21,10 @@
   <app-text-compare />
 </main>
 <main [hidden]="tool() !== 'combine' && tool() !== 'pdf'">
-  <app-image-combine [mode]="combineMode()" (watermark)="openInWatermark($event)" />
+  <app-image-combine [mode]="combineMode()" (send)="openFromCombine($event)" />
 </main>
-<main [hidden]="tool() !== 'watermark'">
+<!-- Crop, Resize and Watermark share one image, so it carries over between them. -->
+<main [hidden]="!isImageTool()">
   <section class="panel controls">
     @if (!original()) {
       <label
@@ -45,39 +48,18 @@
         <button type="button" class="link" (click)="clear()">Change</button>
       </div>
 
-      <nav class="tabs">
-        <button
-          type="button"
-          [class.active]="tab() === 'crop'"
-          [disabled]="fileIsPdf()"
-          [title]="fileIsPdf() ? 'Crop works on images only' : ''"
-          (click)="selectTab('crop')"
-        >
-          Crop
-        </button>
-        <button type="button" [class.active]="tab() === 'rotate'" (click)="selectTab('rotate')">Rotate</button>
-        <button
-          type="button"
-          [class.active]="tab() === 'resize'"
-          [disabled]="fileIsPdf()"
-          [title]="fileIsPdf() ? 'Resize works on images only' : ''"
-          (click)="selectTab('resize')"
-        >
-          Resize
-        </button>
-        <button type="button" [class.active]="tab() === 'watermark'" (click)="selectTab('watermark')">Watermark</button>
-      </nav>
-
-      @switch (tab()) {
+      @switch (tool()) {
         @case ('crop') {
-          <p class="step">Drag the box or its corners to fit the card, then apply.</p>
-          <div class="row buttons">
-            <button type="button" class="secondary" (click)="cropper()?.reset()">Select all</button>
-            <button type="button" class="primary" [disabled]="busy()" (click)="applyCrop()">Apply crop</button>
-          </div>
-        }
-        @case ('rotate') {
-          <p class="step">Each click rotates the {{ fileIsPdf() ? 'PDF pages' : 'image' }} right away.</p>
+          @if (fileIsPdf()) {
+            <p class="step">Cropping works on images only — you can still rotate the PDF pages.</p>
+          } @else {
+            <p class="step">Drag the box or its corners to fit the card, then apply.</p>
+            <div class="row buttons">
+              <button type="button" class="secondary" (click)="cropper()?.reset()">Select all</button>
+              <button type="button" class="primary" [disabled]="busy()" (click)="applyCrop()">Apply crop</button>
+            </div>
+          }
+          <p class="step">Rotate — each click rotates the {{ fileIsPdf() ? 'PDF pages' : 'image' }} right away.</p>
           <div class="row buttons">
             <button type="button" class="secondary" [disabled]="busy()" (click)="rotate(-90)">⟲ Left</button>
             <button type="button" class="secondary" [disabled]="busy()" (click)="rotate(90)">Right ⟳</button>
@@ -85,59 +67,59 @@
           </div>
         }
         @case ('resize') {
-          <p class="step">Set a pixel size, a maximum file size, or both. Leave a box empty to keep it as is.</p>
-          <div class="row">
-            <label class="field grow">
-              <span>Width (px)</span>
-              <input
-                type="number"
-                min="1"
-                [placeholder]="editedSize()?.width ?? ''"
-                [(ngModel)]="resizeWidth"
-                (ngModelChange)="widthChanged()"
-              />
+          @if (fileIsPdf()) {
+            <p class="step">Resize works on images only. A PDF can be rotated in Crop or stamped in Watermark.</p>
+          } @else {
+            <p class="step">Set a pixel size, a maximum file size, or both. Leave a box empty to keep it as is.</p>
+            <div class="row">
+              <label class="field grow">
+                <span>Width (px)</span>
+                <input
+                  type="number"
+                  min="1"
+                  [placeholder]="editedSize()?.width ?? ''"
+                  [(ngModel)]="resizeWidth"
+                  (ngModelChange)="widthChanged()"
+                />
+              </label>
+              <span class="times">×</span>
+              <label class="field grow">
+                <span>Height (px)</span>
+                <input
+                  type="number"
+                  min="1"
+                  [placeholder]="editedSize()?.height ?? ''"
+                  [(ngModel)]="resizeHeight"
+                  (ngModelChange)="heightChanged()"
+                />
+              </label>
+            </div>
+            <label class="check">
+              <input type="checkbox" [(ngModel)]="keepAspect" (ngModelChange)="widthChanged()" />
+              Keep aspect ratio
             </label>
-            <span class="times">×</span>
-            <label class="field grow">
-              <span>Height (px)</span>
-              <input
-                type="number"
-                min="1"
-                [placeholder]="editedSize()?.height ?? ''"
-                [(ngModel)]="resizeHeight"
-                (ngModelChange)="heightChanged()"
-              />
+
+            <label class="field">
+              <span>Max file size (KB) <em>optional</em></span>
+              <input type="number" min="1" placeholder="No limit" [(ngModel)]="maxKb" (ngModelChange)="resizeChanged()" />
             </label>
-          </div>
-          <label class="check">
-            <input type="checkbox" [(ngModel)]="keepAspect" (ngModelChange)="widthChanged()" />
-            Keep aspect ratio
-          </label>
+            <div class="chips">
+              @for (kb of kbPresets; track kb) {
+                <button type="button" class="secondary" [class.active]="maxKb === kb" (click)="setMaxKb(kb)">{{ kb }} KB</button>
+              }
+              <button type="button" class="secondary" [class.active]="!maxKb" (click)="setMaxKb(null)">No limit</button>
+            </div>
 
-          <label class="field">
-            <span>Max file size (KB) <em>optional</em></span>
-            <input type="number" min="1" placeholder="No limit" [(ngModel)]="maxKb" (ngModelChange)="resizeChanged()" />
-          </label>
-          <div class="chips">
-            @for (kb of kbPresets; track kb) {
-              <button type="button" class="secondary" [class.active]="maxKb === kb" (click)="setMaxKb(kb)">{{ kb }} KB</button>
-            }
-            <button type="button" class="secondary" [class.active]="!maxKb" (click)="setMaxKb(null)">No limit</button>
-          </div>
+            <label class="field">
+              <span>Format</span>
+              <select [(ngModel)]="resizeType" (ngModelChange)="resizeChanged()">
+                <option value="image/jpeg">JPG (smallest files)</option>
+                <option value="image/webp">WEBP</option>
+                <option value="image/png">PNG (lossless, larger)</option>
+              </select>
+            </label>
 
-          <label class="field">
-            <span>Format</span>
-            <select [(ngModel)]="resizeType" (ngModelChange)="resizeChanged()">
-              <option value="image/jpeg">JPG (smallest files)</option>
-              <option value="image/webp">WEBP</option>
-              <option value="image/png">PNG (lossless, larger)</option>
-            </select>
-          </label>
-
-          <label class="check">
-            <input type="checkbox" [(ngModel)]="resizeWithWatermark" (ngModelChange)="resizeChanged()" />
-            Include the watermark
-          </label>
+          }
         }
         @case ('watermark') {
           <label class="field">
@@ -189,7 +171,7 @@
         <p class="error">{{ error() }}</p>
       }
 
-      @if (tab() === 'watermark') {
+      @if (tool() === 'watermark') {
         <a
           class="download"
           [class.disabled]="!result() || busy()"
@@ -201,7 +183,7 @@
         @if (result(); as r) {
           <small class="hint">{{ r.name }}</small>
         }
-      } @else if (tab() === 'resize') {
+      } @else if (tool() === 'resize' && !fileIsPdf()) {
         <a
           class="download"
           [class.disabled]="!resized() || busy()"
@@ -219,17 +201,28 @@
             <p class="error">Could not get it under {{ maxKb }} KB — this is the smallest it goes.</p>
           }
         }
-      } @else {
-        <button type="button" class="secondary" [disabled]="busy() || !editCount()" (click)="downloadEdited()">
-          Download without watermark
+      } @else if (tool() === 'crop') {
+        <button type="button" class="primary" [disabled]="busy() || !editCount()" (click)="downloadEdited()">
+          Download {{ fileIsPdf() ? 'rotated PDF' : 'cropped image' }}
         </button>
       }
 
-      @if (editCount()) {
+      @if (tool() === 'crop' && editCount()) {
         <button type="button" class="link center" (click)="undoAll()">
           Undo all crop / rotate changes ({{ editCount() }})
         </button>
       }
+
+      <div class="forward">
+        <span>Use this {{ tool() === 'crop' ? 'image' : 'result' }} in</span>
+        <div class="chips">
+          @for (t of forwardTargets(); track t.id) {
+            <button type="button" class="secondary" [disabled]="!canForward(t.id)" (click)="forward(t.id)">
+              {{ t.label }} →
+            </button>
+          }
+        </div>
+      </div>
     }
   </section>
 
@@ -237,24 +230,25 @@
     @if (!edited()) {
       <p class="empty">The preview shows up here</p>
     } @else {
-      @switch (tab()) {
+      @switch (tool()) {
         @case ('crop') {
-          <app-image-cropper [file]="edited()!" />
-        }
-        @case ('rotate') {
-          @if (editedPreview(); as p) {
-            @if (p.pdfUrl) {
+          @if (!fileIsPdf()) {
+            <app-image-cropper [file]="edited()!" />
+          } @else {
+            @if (editedPreview(); as p) {
               <iframe [src]="p.pdfUrl" title="PDF preview"></iframe>
-            } @else {
-              <img [src]="p.url" alt="Image preview" />
             }
           }
         }
         @case ('resize') {
-          @if (resized(); as r) {
-            <img [src]="r.url" alt="Resized preview" />
+          @if (fileIsPdf()) {
+            <p class="empty">Resize works on images only</p>
           } @else {
-            <p class="empty">{{ busy() ? 'Working…' : 'The resized image shows up here' }}</p>
+            @if (resized(); as r) {
+              <img [src]="r.url" alt="Resized preview" />
+            } @else {
+              <p class="empty">{{ busy() ? 'Working…' : 'The resized image shows up here' }}</p>
+            }
           }
         }
         @case ('watermark') {
