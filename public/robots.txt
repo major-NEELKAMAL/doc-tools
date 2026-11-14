@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://cropresizecompare.risegap.com/sitemap.xml
+Sitemap: https://www.image-picture.com/sitemap.xml

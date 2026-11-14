@@ -24,13 +24,13 @@ files are never sent to the server.
     npm install
     npx ng serve                     # http://localhost:4200
 
-## Deploy (https://cropresizecompare.risegap.com)
+## Deploy (https://www.image-picture.com)
 
-The `Jenkinsfile` ships the source to the test VM (same pipeline as
-risegap-admin), builds the image there and runs it on `127.0.0.1:8082`. The
-VM's host nginx terminates HTTPS on 443 with the Cloudflare Origin Certificate
-(`*.risegap.com`) and routes `cropresizecompare.risegap.com` to that port
-(config: `deploy/nginx-risegap.conf` in the risegap-api repo). That host is
-also the canonical URL in `index.html`, `robots.txt` and `sitemap.xml`.
-Cloudflare: proxied, pointing at the test VM. The internal names
-(container, image, Angular project) are still `doc-watermark`.
+Cloudflare Workers static assets, configured in `wrangler.jsonc`. Cloudflare
+builds every push to `main` (`npm run build`, then `npx wrangler deploy`) and
+serves `dist/doc-watermark/browser`, sending unknown paths to `index.html`.
+Response headers come from `public/_headers`. `image-picture.com` gets a 301
+redirect to `www` (a Cloudflare Redirect Rule), and Always Use HTTPS is on.
+`www.image-picture.com` is the canonical URL in `index.html`, `robots.txt` and
+`sitemap.xml`. The Dockerfile and nginx config are kept only for running the
+app locally. The internal names (Angular project, image) are still `doc-watermark`.
