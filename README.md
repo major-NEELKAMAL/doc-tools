@@ -32,5 +32,7 @@ serves `dist/doc-watermark/browser`, sending unknown paths to `index.html`.
 Response headers come from `public/_headers`. `image-picture.com` gets a 301
 redirect to `www` (a Cloudflare Redirect Rule), and Always Use HTTPS is on.
 `www.image-picture.com` is the canonical URL in `index.html`, `robots.txt` and
-`sitemap.xml`. The Dockerfile and nginx config are kept only for running the
-app locally. The internal names (Angular project, image) are still `doc-watermark`.
+`sitemap.xml`. The Dockerfile, nginx config and `Jenkinsfile` are kept for the old
+deploy to the risegap test VM (`127.0.0.1:8082`, cropresizecompare.risegap.com).
+That Jenkins job (`docker-deploy-doc-watermark`) is disabled; enable it to
+use it again. The internal names (Angular project, image) are still `doc-watermark`.
