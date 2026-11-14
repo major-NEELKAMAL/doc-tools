@@ -1,0 +1,9 @@
+{
+  // Cloudflare Workers static-assets deploy (image-piture.com).
+  "name": "doc-tools",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./dist/doc-watermark/browser",
+    "not_found_handling": "single-page-application"
+  }
+}
