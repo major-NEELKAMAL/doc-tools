@@ -1,5 +1,5 @@
 import { Component, ElementRef, effect, input, output, signal, viewChild } from '@angular/core';
-import { formatTime } from './video-ffmpeg';
+import { formatTime } from './video-api';
 
 /** A video with its own control bar: play/pause, seek, skip, volume (min/max/mute), speed, fullscreen. */
 @Component({

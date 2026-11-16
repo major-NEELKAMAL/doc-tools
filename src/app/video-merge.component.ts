@@ -1,18 +1,43 @@
 import { Component, OnDestroy, computed, effect, input, signal, untracked } from '@angular/core';
-import { MAX_VIDEO_BYTES, storeVideoCopies } from './doc-upload';
-import { baseName } from './image-edit';
 import { VideoPlayerComponent } from './video-player.component';
-import { VIDEO_ACCEPT, cancelVideoJob, isVideo, mergeVideos } from './video-ffmpeg';
+import {
+  MAX_MERGE_BYTES,
+  MAX_VIDEO_BYTES,
+  VIDEO_ACCEPT,
+  VideoResult,
+  VideoSource,
+  cancelJob,
+  formatSize,
+  isVideo,
+  startMerge,
+  uploadVideo,
+  waitForJob,
+} from './video-api';
 
 interface Item {
   id: number;
-  file: File;
+  name: string;
+  size: number;
+  /** What the player plays: a local file (read from disk as it plays) or the server result (streamed in ranges). */
   url: string;
-  /** Came from the Video crop tool. */
-  seeded?: boolean;
+  /** A picked file, uploaded in the background. */
+  file?: File;
+  upload?: Promise<string>;
+  abort?: AbortController;
+  /** The Video crop result, already on the server. */
+  job?: string;
 }
 
-/** Several videos in a user-chosen order, joined into one. */
+interface UploadState {
+  state: 'uploading' | 'done' | 'failed';
+  progress: number;
+}
+
+/**
+ * Several videos in a user-chosen order, joined into one on the server. Picked
+ * videos upload as soon as they are added; the cropped clip from Video crop is
+ * already on the server and goes first.
+ */
 @Component({
   selector: 'app-video-merge',
   standalone: true,
@@ -33,7 +58,7 @@ interface Item {
         } @else {
           <strong>Click to choose videos</strong>
           <span>or drag &amp; drop them here</span>
-          <small>MP4, WEBM, MOV or MKV, up to 100 MB each — pick two or more</small>
+          <small>MP4, WEBM, MOV or MKV, up to 1 GB each — pick two or more</small>
         }
       </label>
 
@@ -51,12 +76,21 @@ interface Item {
               (drop)="onItemDrop($event, i)"
               (dragend)="dragFrom = null; dragOver.set(null)"
             >
-              <button type="button" class="name" [title]="item.file.name" (click)="play(item.id)">
-                {{ i + 1 }}. {{ item.file.name }}
-                @if (item.seeded) {
-                  <em>(cropped)</em>
+              <div class="item-main">
+                <button type="button" class="name" [title]="item.name" (click)="play(item.id)">
+                  {{ i + 1 }}. {{ item.name }}
+                  @if (item.job) {
+                    <em>(cropped)</em>
+                  }
+                </button>
+                @if (uploads()[item.id]; as u) {
+                  @if (u.state === 'uploading') {
+                    <progress [value]="u.progress" max="1" [title]="'Uploading ' + (u.progress * 100).toFixed(0) + '%'"></progress>
+                  } @else if (u.state === 'failed') {
+                    <small class="error">Upload failed — retries when you merge</small>
+                  }
                 }
-              </button>
+              </div>
               <button type="button" class="icon" title="Move up" [disabled]="first || busy()" (click)="move(i, -1)">↑</button>
               <button type="button" class="icon" title="Move down" [disabled]="last || busy()" (click)="move(i, 1)">↓</button>
               <button type="button" class="icon" title="Remove" [disabled]="busy()" (click)="remove(i)">✕</button>
@@ -64,7 +98,13 @@ interface Item {
           }
         </ol>
         <button type="button" class="link" [disabled]="busy()" (click)="clear()">Remove all</button>
-        <small class="note">Videos with the same format and size join instantly; otherwise they are re-encoded to MP4, which takes a while.</small>
+        <small class="total" [class.over]="overCap()">
+          Total {{ fsize(totalBytes()) }} of {{ fsize(maxBytes) }} max
+          @if (overCap()) {
+            — remove or crop a video to merge
+          }
+        </small>
+        <small class="note">Videos with the same format and size join quickly; otherwise they are re-encoded to MP4, which takes longer.</small>
       }
 
       @if (error()) {
@@ -72,15 +112,18 @@ interface Item {
       }
 
       @if (items().length) {
-        @if (busy()) {
-          <progress [value]="progress()" max="1"></progress>
+        @if (phase() !== 'idle') {
+          <p class="step">{{ phase() === 'uploading' ? 'Waiting for the uploads to finish…' : 'Merging on the server…' }}</p>
+          <progress [value]="phase() === 'uploading' ? uploadTotal() : progress()" max="1"></progress>
           <button type="button" class="secondary" (click)="cancel()">Cancel</button>
         } @else {
-          <button type="button" class="primary" [disabled]="items().length < 2" (click)="merge()">Merge videos</button>
+          <button type="button" class="primary" [disabled]="items().length < 2 || overCap()" (click)="merge()">
+            Merge videos
+          </button>
         }
         @if (result(); as r) {
-          <a class="download" [attr.href]="r.url" [attr.download]="r.file.name">Download merged video</a>
-          <small class="hint">{{ r.file.name }} · {{ size(r.file.size) }}</small>
+          <a class="download" [attr.href]="r.downloadUrl">Download merged video</a>
+          <small class="hint">{{ r.name }} · {{ fsize(r.size) }}</small>
         }
       }
     </section>
@@ -95,7 +138,7 @@ interface Item {
       @if (playingUrl(); as url) {
         <app-video-player [src]="url" />
       } @else {
-        <p class="empty">{{ busy() ? 'Working…' : 'The video plays here' }}</p>
+        <p class="empty">The video plays here</p>
       }
     </section>
   `,
@@ -129,8 +172,20 @@ interface Item {
       border-color: #2563eb;
       background: #f3f7ff;
     }
-    .items .name {
+    .item-main {
       flex: 1;
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+    .item-main progress {
+      width: 100%;
+      height: 6px;
+    }
+    .item-main .error {
+      font-size: 0.75rem;
+    }
+    .items .name {
       min-width: 0;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -159,8 +214,13 @@ interface Item {
       font: inherit;
       line-height: 1;
     }
-    .note {
+    .note,
+    .total {
       color: #6b7280;
+    }
+    .total.over {
+      color: #b91c1c;
+      font-weight: 600;
     }
     progress {
       width: 100%;
@@ -169,11 +229,23 @@ interface Item {
 })
 export class VideoMergeComponent implements OnDestroy {
   readonly accept = VIDEO_ACCEPT;
-  /** The Video crop tool's result; it goes first in the list. */
-  readonly seed = input<File | null>(null);
+  /** The Video crop tool's result (on the server); it goes first in the list. */
+  readonly seed = input<VideoResult | null>(null);
 
   readonly items = signal<Item[]>([]);
-  readonly result = signal<{ file: File; url: string } | null>(null);
+  readonly uploads = signal<Record<number, UploadState>>({});
+  /** Overall upload progress across the picked files, by size. */
+  readonly uploadTotal = computed(() => {
+    const files = this.items().filter((it) => it.file);
+    const total = files.reduce((s, it) => s + it.file!.size, 0);
+    if (!total) return 1;
+    return files.reduce((s, it) => s + it.file!.size * (this.uploads()[it.id]?.progress ?? 0), 0) / total;
+  });
+  readonly maxBytes = MAX_MERGE_BYTES;
+  /** The merged video can't be bigger than its inputs together, so they're capped at 2 GB. */
+  readonly totalBytes = computed(() => this.items().reduce((s, it) => s + it.size, 0));
+  readonly overCap = computed(() => this.totalBytes() > MAX_MERGE_BYTES);
+  readonly result = signal<VideoResult | null>(null);
   readonly showResult = signal(false);
   readonly playingId = signal<number | null>(null);
   readonly playingUrl = computed(() => {
@@ -181,27 +253,28 @@ export class VideoMergeComponent implements OnDestroy {
     const items = this.items();
     return (items.find((it) => it.id === this.playingId()) ?? items[0])?.url ?? null;
   });
-  readonly busy = signal(false);
+  readonly phase = signal<'idle' | 'uploading' | 'processing'>('idle');
+  readonly busy = computed(() => this.phase() !== 'idle');
   readonly progress = signal(0);
   readonly error = signal('');
   readonly dragging = signal(false);
   readonly dragOver = signal<number | null>(null);
   dragFrom: number | null = null;
 
-  readonly size = (n: number) => (n < 1048576 ? (n / 1024).toFixed(0) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+  readonly fsize = formatSize;
 
   private nextId = 0;
+  private job: { id: string | null; abort: AbortController } | null = null;
 
   constructor() {
     // A new crop replaces the previous cropped clip at the top of the list.
     effect(() => {
-      const file = this.seed();
+      const seed = this.seed();
       untracked(() => {
-        const old = this.items().find((it) => it.seeded);
-        if (old?.file === file) return;
-        if (old) URL.revokeObjectURL(old.url);
-        const rest = this.items().filter((it) => !it.seeded);
-        this.items.set(file ? [{ id: this.nextId++, file, url: URL.createObjectURL(file), seeded: true }, ...rest] : rest);
+        const old = this.items().find((it) => it.job);
+        if (old?.job === seed?.jobId) return;
+        const rest = this.items().filter((it) => !it.job);
+        this.items.set(seed ? [{ id: this.nextId++, name: seed.name, size: seed.size, url: seed.url, job: seed.jobId }, ...rest] : rest);
         this.changed();
       });
     });
@@ -249,49 +322,63 @@ export class VideoMergeComponent implements OnDestroy {
   }
 
   remove(i: number): void {
-    URL.revokeObjectURL(this.items()[i].url);
+    this.release(this.items()[i]);
     this.items.update((list) => list.filter((_, j) => j !== i));
     this.changed();
   }
 
   clear(): void {
-    this.items().forEach((it) => URL.revokeObjectURL(it.url));
+    this.items().forEach((it) => this.release(it));
     this.items.set([]);
     this.error.set('');
     this.changed();
   }
 
   async merge(): Promise<void> {
-    const files = this.items().map((it) => it.file);
-    if (files.length < 2 || this.busy()) return;
+    const items = this.items();
+    if (items.length < 2 || this.busy() || this.overCap()) return;
     this.error.set('');
-    this.busy.set(true);
-    this.progress.set(0);
+    const job = { id: null as string | null, abort: new AbortController() };
+    this.job = job;
     try {
-      const out = await mergeVideos(files, (p) => this.progress.set(p));
-      if (!this.busy()) return; // cancelled or list changed
-      const file = new File([out.blob], baseName(files[0]) + '_merged.' + out.extension, { type: out.blob.type });
-      this.setResult({ file, url: URL.createObjectURL(file) });
+      this.phase.set('uploading');
+      items.filter((it) => this.uploads()[it.id]?.state === 'failed').forEach((it) => this.startUpload(it));
+      const sources: VideoSource[] = [];
+      for (const it of items) sources.push(it.job ? { job: it.job } : { upload: await it.upload! });
+      if (job.abort.signal.aborted) return;
+      this.phase.set('processing');
+      this.progress.set(0);
+      job.id = await startMerge(sources, items[0].name);
+      if (job.abort.signal.aborted) {
+        cancelJob(job.id);
+        return;
+      }
+      const result = await waitForJob(job.id, (p) => this.progress.set(p), job.abort.signal);
+      if (this.job !== job) return; // the list changed meanwhile
+      this.result.set(result);
       this.showResult.set(true);
     } catch (e) {
-      if (this.busy()) {
-        console.error(e);
-        this.error.set('Could not merge these videos. One of them may be damaged or in a format the browser cannot read.');
-      }
+      if (!job.abort.signal.aborted) this.error.set(e instanceof Error ? e.message : 'Could not merge these videos.');
     } finally {
-      this.busy.set(false);
+      if (this.job === job) {
+        this.job = null;
+        this.phase.set('idle');
+      }
     }
   }
 
   cancel(): void {
-    cancelVideoJob();
-    this.busy.set(false);
+    const job = this.job;
+    if (!job) return;
+    job.abort.abort();
+    if (job.id) cancelJob(job.id);
+    this.job = null;
+    this.phase.set('idle');
     this.error.set('Cancelled.');
   }
 
   ngOnDestroy(): void {
-    this.items().forEach((it) => URL.revokeObjectURL(it.url));
-    this.setResult(null);
+    this.items().forEach((it) => this.release(it));
   }
 
   private addFiles(list: FileList | File[] | null | undefined): void {
@@ -303,15 +390,40 @@ export class VideoMergeComponent implements OnDestroy {
     this.error.set(
       [
         notVideo ? 'Only video files can be added — the rest were skipped.' : '',
-        tooBig.length ? `Over the 100 MB limit, not added: ${tooBig.join(', ')}.` : '',
+        tooBig.length ? `Over the 1 GB limit, not added: ${tooBig.join(', ')}.` : '',
       ]
         .filter(Boolean)
         .join(' '),
     );
     if (!videos.length) return;
-    storeVideoCopies(videos);
-    this.items.update((items) => [...items, ...videos.map((file) => ({ id: this.nextId++, file, url: URL.createObjectURL(file) }))]);
+    const added: Item[] = videos.map((file) => ({
+      id: this.nextId++,
+      name: file.name,
+      size: file.size,
+      file,
+      url: URL.createObjectURL(file),
+    }));
+    this.items.update((items) => [...items, ...added]);
+    added.forEach((it) => this.startUpload(it));
     this.changed();
+  }
+
+  private startUpload(item: Item): void {
+    item.abort?.abort();
+    item.abort = new AbortController();
+    const set = (u: UploadState) => this.uploads.update((m) => ({ ...m, [item.id]: u }));
+    set({ state: 'uploading', progress: 0 });
+    item.upload = uploadVideo(item.file!, (p) => set({ state: 'uploading', progress: p }), item.abort.signal);
+    item.upload.then(
+      () => set({ state: 'done', progress: 1 }),
+      () => !item.abort!.signal.aborted && set({ state: 'failed', progress: 0 }),
+    );
+  }
+
+  private release(item: Item | undefined): void {
+    if (!item?.file) return;
+    item.abort?.abort();
+    URL.revokeObjectURL(item.url);
   }
 
   private reorder(from: number, to: number): void {
@@ -325,15 +437,13 @@ export class VideoMergeComponent implements OnDestroy {
 
   /** The list changed: the merged video no longer matches it. */
   private changed(): void {
-    if (this.busy()) cancelVideoJob();
-    this.busy.set(false);
-    this.setResult(null);
+    if (this.job) {
+      this.job.abort.abort();
+      if (this.job.id) cancelJob(this.job.id);
+      this.job = null;
+      this.phase.set('idle');
+    }
+    this.result.set(null);
     this.showResult.set(false);
-  }
-
-  private setResult(r: { file: File; url: string } | null): void {
-    const old = this.result();
-    if (old) URL.revokeObjectURL(old.url);
-    this.result.set(r);
   }
 }

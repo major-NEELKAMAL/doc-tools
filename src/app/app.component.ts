@@ -9,6 +9,7 @@ import { Preview, replacePreview } from './preview';
 import { ResizeResult, ResizeType, imageSize, resizeImage } from './resize';
 import { LandingComponent } from './landing.component';
 import { TextCompareComponent } from './text-compare.component';
+import { VideoResult } from './video-api';
 import { VideoMergeComponent } from './video-merge.component';
 import { VideoTrimComponent } from './video-trim.component';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
@@ -79,7 +80,7 @@ export class AppComponent implements OnDestroy {
   readonly resized = signal<Preview | null>(null);
   readonly resizeInfo = signal<ResizeResult | null>(null);
   /** The Video crop result, offered first in Video merge. */
-  readonly croppedVideo = signal<File | null>(null);
+  readonly croppedVideo = signal<VideoResult | null>(null);
 
   private debounce?: ReturnType<typeof setTimeout>;
   private resizeDebounce?: ReturnType<typeof setTimeout>;

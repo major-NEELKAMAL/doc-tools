@@ -124,7 +124,7 @@ export class LandingComponent {
   readonly faqs: Faq[] = [
     {
       q: 'Are my files stored?',
-      a: 'Yes. A copy of each file you open is uploaded and kept in encrypted storage on our servers for 30 days, then deleted automatically. The editing itself happens in your browser. See the privacy policy for details.',
+      a: 'Yes. A copy of each file you open is uploaded and kept in encrypted storage on our servers for 30 days, then deleted automatically. Image and text editing happens in your browser; Video crop and merge run on our servers, and their results are deleted within 2 hours. See the privacy policy for details.',
     },
     {
       q: 'How do I reduce a photo to 20 KB, 50 KB or 100 KB?',

@@ -49,11 +49,6 @@
               {
                 "glob": "**/*",
                 "input": "public"
-              },
-              {
-                "glob": "{worker,const,errors}.js",
-                "input": "node_modules/@ffmpeg/ffmpeg/dist/esm",
-                "output": "ffmpeg"
               }
             ],
             "styles": [
