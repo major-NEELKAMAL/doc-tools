@@ -80,7 +80,7 @@ interface UploadState {
                 <button type="button" class="name" [title]="item.name" (click)="play(item.id)">
                   {{ i + 1 }}. {{ item.name }}
                   @if (item.job) {
-                    <em>(cropped)</em>
+                    <em>(edited)</em>
                   }
                 </button>
                 @if (uploads()[item.id]; as u) {

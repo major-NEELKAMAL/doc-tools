@@ -9,7 +9,7 @@ import {
   formatSize,
   formatTime,
   isVideo,
-  startTrim,
+  startCut,
   uploadVideo,
   waitForJob,
 } from './video-api';
@@ -24,7 +24,8 @@ interface Source {
 }
 
 /**
- * Crops a video in time: keep only what lies between a start and an end time.
+ * Cuts a part out of a video: what lies between "Cut from" and "Cut to" is
+ * removed and the rest is joined.
  * The video uploads as soon as it is picked; the cut runs on the server and
  * the result plays (streamed in ranges) from there.
  */
@@ -55,7 +56,7 @@ interface Source {
         @if (uploadState() !== 'done') {
           <div class="upload-state">
             @if (uploadState() === 'failed') {
-              <span class="error">Upload failed — it will retry when you crop.</span>
+              <span class="error">Upload failed — it will retry when you cut.</span>
             } @else {
               <span>Uploading {{ (uploadProgress() * 100).toFixed(0) }}% of {{ fsize(source()!.file.size) }}</span>
               <progress [value]="uploadProgress()" max="1"></progress>
@@ -63,7 +64,8 @@ interface Source {
           </div>
         }
         <p class="step">
-          Choose the part to keep. Leave "Cut to" empty to keep everything to the end.
+          Choose the part to remove — it is cut out and the rest is joined. Leave "Cut to" empty to remove
+          everything from "Cut from" to the end.
           @if (duration()) {
             The video is {{ fmt(duration()) }} long.
           }
@@ -90,7 +92,7 @@ interface Source {
               <button type="button" class="secondary" (click)="useCurrent(t.key)">Use player time</button>
             </div>
             @if (t.key === 'to') {
-              <small class="hint-left">Empty = to the end of the video</small>
+              <small class="hint-left">Empty = remove to the end of the video</small>
             }
           </fieldset>
         }
@@ -104,17 +106,17 @@ interface Source {
         }
 
         @if (phase() !== 'idle') {
-          <p class="step">{{ phase() === 'uploading' ? 'Waiting for the upload to finish…' : 'Cropping on the server…' }}</p>
+          <p class="step">{{ phase() === 'uploading' ? 'Waiting for the upload to finish…' : 'Cutting on the server…' }}</p>
           <progress [value]="phase() === 'uploading' ? uploadProgress() : progress()" max="1"></progress>
           <button type="button" class="secondary" (click)="cancel()">Cancel</button>
         } @else {
-          <button type="button" class="primary" (click)="crop()">Crop video</button>
+          <button type="button" class="primary" (click)="crop()">Cut out this part</button>
         }
 
         @if (result(); as r) {
-          <a class="download" [attr.href]="r.downloadUrl">Download cropped video</a>
+          <a class="download" [attr.href]="r.downloadUrl">Download edited video</a>
           <small class="hint">{{ r.name }} · {{ fsize(r.size) }}</small>
-          <small class="note">Every crop starts from the original video — change the times and crop again anytime.</small>
+          <small class="note">Every cut starts from the original video — change the times and cut again anytime.</small>
           <div class="forward">
             <span>Use this result in</span>
             <div class="chips">
@@ -132,7 +134,7 @@ interface Source {
       @if (playingUrl(); as url) {
         @if (result()) {
           <div class="tabs">
-            <button type="button" [class.active]="view() === 'result'" (click)="view.set('result')">Cropped</button>
+            <button type="button" [class.active]="view() === 'result'" (click)="view.set('result')">Edited</button>
             <button type="button" [class.active]="view() === 'original'" (click)="view.set('original')">Original</button>
           </div>
         }
@@ -214,7 +216,7 @@ export class VideoTrimComponent implements OnDestroy {
   readonly accept = VIDEO_ACCEPT;
   /** "Video merge →" clicked. */
   readonly merge = output<void>();
-  /** The cropped video on the server, or null when there is none. */
+  /** The edited video on the server, or null when there is none. */
   readonly cropped = output<VideoResult | null>();
   readonly player = viewChild(VideoPlayerComponent);
 
@@ -299,6 +301,10 @@ export class VideoTrimComponent implements OnDestroy {
       this.error.set('"Cut from" is past the end of the video (' + formatTime(this.duration()) + ').');
       return;
     }
+    if (start <= 0.05 && this.duration() && end >= this.duration() - 0.05) {
+      this.error.set('That would remove the whole video.');
+      return;
+    }
     this.error.set('');
     const job = { id: null as string | null, abort: new AbortController() };
     this.job = job;
@@ -309,7 +315,7 @@ export class VideoTrimComponent implements OnDestroy {
       if (job.abort.signal.aborted) return;
       this.phase.set('processing');
       this.progress.set(0);
-      job.id = await startTrim({ upload: uploadId }, src.file.name, start, end, this.exact);
+      job.id = await startCut({ upload: uploadId }, src.file.name, start, end, this.exact);
       if (job.abort.signal.aborted) {
         cancelJob(job.id);
         return;
@@ -320,7 +326,7 @@ export class VideoTrimComponent implements OnDestroy {
       this.cropped.emit(result);
       this.view.set('result');
     } catch (e) {
-      if (!job.abort.signal.aborted) this.error.set(e instanceof Error ? e.message : 'Could not crop this video.');
+      if (!job.abort.signal.aborted) this.error.set(e instanceof Error ? e.message : 'Could not cut this video.');
     } finally {
       if (this.job === job) {
         this.job = null;

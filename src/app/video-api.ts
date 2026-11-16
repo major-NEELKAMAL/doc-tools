@@ -90,8 +90,11 @@ export async function uploadVideo(file: File, onProgress?: Progress, signal?: Ab
   return uploadId;
 }
 
-export function startTrim(source: VideoSource, name: string, start: number, end: number, exact: boolean): Promise<string> {
-  return call<{ jobId: string }>('POST', '/video/trim', { source, name, start, end, exact }).then((d) => d.jobId);
+/** Cuts [start, end) out of the video and joins what is left before and after it. */
+export function startCut(source: VideoSource, name: string, start: number, end: number, exact: boolean): Promise<string> {
+  return call<{ jobId: string }>('POST', '/video/trim', { source, name, start, end, exact, remove: true }).then(
+    (d) => d.jobId,
+  );
 }
 
 export function startMerge(sources: VideoSource[], name: string): Promise<string> {

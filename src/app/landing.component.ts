@@ -111,13 +111,13 @@ export class LandingComponent {
       tool: 'video-crop',
       icon: '🎬',
       title: 'Video crop',
-      text: 'Keep just the part of a video between a start and an end time, and preview it before you download.',
+      text: 'Cut a part out of a video between two times and keep the rest, with a preview before you download.',
     },
     {
       tool: 'video-merge',
       icon: '🎞️',
       title: 'Video merge',
-      text: 'Join several videos — or your cropped clip and more — into one, in the order you choose.',
+      text: 'Join several videos — or your edited clip and more — into one, in the order you choose.',
     },
   ];
 
