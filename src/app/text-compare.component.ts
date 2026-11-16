@@ -142,7 +142,8 @@ export class TextCompareComponent {
 
   readonly left = signal('');
   readonly right = signal('');
-  readonly viewMode = signal<'side' | 'unified'>('side');
+  // Side by side needs room; phones start on the unified view.
+  readonly viewMode = signal<'side' | 'unified'>(window.matchMedia('(max-width: 600px)').matches ? 'unified' : 'side');
   /** The texts as of the last Compare click. */
   readonly compared = signal<{ left: string; right: string } | null>(null);
   readonly error = signal('');

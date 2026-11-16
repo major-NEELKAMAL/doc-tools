@@ -1,7 +1,7 @@
 import { Component, OnDestroy, computed, output, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { VideoPlayerComponent } from './video-player.component';
-import { storeVideoCopies } from './doc-upload';
+import { MAX_VIDEO_BYTES, storeVideoCopies } from './doc-upload';
 import { baseName } from './image-edit';
 import { VIDEO_ACCEPT, cancelVideoJob, formatTime, isVideo, parseTime, trimVideo } from './video-ffmpeg';
 
@@ -28,7 +28,7 @@ interface Clip {
           <input type="file" [accept]="accept" (change)="onFileInput($event)" hidden />
           <strong>Click to choose a video</strong>
           <span>or drag &amp; drop here</span>
-          <small>MP4, WEBM, MOV or MKV</small>
+          <small>MP4, WEBM, MOV or MKV — up to 100 MB</small>
         </label>
       } @else {
         <div class="file">
@@ -223,6 +223,10 @@ export class VideoTrimComponent implements OnDestroy {
     if (!file) return;
     if (!isVideo(file)) {
       this.error.set('Please choose a video file (MP4, WEBM, MOV or MKV).');
+      return;
+    }
+    if (file.size > MAX_VIDEO_BYTES) {
+      this.error.set(`This video is ${this.size(file.size)} — videos up to 100 MB are supported.`);
       return;
     }
     this.error.set('');

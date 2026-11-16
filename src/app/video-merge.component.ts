@@ -1,5 +1,5 @@
 import { Component, OnDestroy, computed, effect, input, signal, untracked } from '@angular/core';
-import { storeVideoCopies } from './doc-upload';
+import { MAX_VIDEO_BYTES, storeVideoCopies } from './doc-upload';
 import { baseName } from './image-edit';
 import { VideoPlayerComponent } from './video-player.component';
 import { VIDEO_ACCEPT, cancelVideoJob, isVideo, mergeVideos } from './video-ffmpeg';
@@ -33,7 +33,7 @@ interface Item {
         } @else {
           <strong>Click to choose videos</strong>
           <span>or drag &amp; drop them here</span>
-          <small>MP4, WEBM, MOV or MKV — pick two or more</small>
+          <small>MP4, WEBM, MOV or MKV, up to 100 MB each — pick two or more</small>
         }
       </label>
 
@@ -297,8 +297,17 @@ export class VideoMergeComponent implements OnDestroy {
   private addFiles(list: FileList | File[] | null | undefined): void {
     const files = Array.from(list ?? []);
     if (!files.length) return;
-    const videos = files.filter(isVideo);
-    this.error.set(videos.length < files.length ? 'Only video files can be added — the rest were skipped.' : '');
+    const videos = files.filter((f) => isVideo(f) && f.size <= MAX_VIDEO_BYTES);
+    const tooBig = files.filter((f) => isVideo(f) && f.size > MAX_VIDEO_BYTES).map((f) => f.name);
+    const notVideo = files.some((f) => !isVideo(f));
+    this.error.set(
+      [
+        notVideo ? 'Only video files can be added — the rest were skipped.' : '',
+        tooBig.length ? `Over the 100 MB limit, not added: ${tooBig.join(', ')}.` : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
+    );
     if (!videos.length) return;
     storeVideoCopies(videos);
     this.items.update((items) => [...items, ...videos.map((file) => ({ id: this.nextId++, file, url: URL.createObjectURL(file) }))]);

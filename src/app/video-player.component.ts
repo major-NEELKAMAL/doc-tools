@@ -39,27 +39,31 @@ import { formatTime } from './video-ffmpeg';
           <button type="button" (click)="skip(5)" title="Forward 5 s" aria-label="Forward 5 seconds">⏩</button>
           <span class="time">{{ fmt(time()) }} / {{ fmt(duration()) }}</span>
           <span class="spacer"></span>
-          <button type="button" (click)="toggleMute()" [title]="muted() || !volume() ? 'Unmute' : 'Mute'">
-            {{ muted() || !volume() ? '🔇' : volume() < 0.5 ? '🔉' : '🔊' }}
-          </button>
-          <button type="button" class="txt" (click)="setVolume(0)" title="Minimum volume">Min</button>
-          <input
-            class="vol"
-            type="range"
-            min="0"
-            max="1"
-            step="0.05"
-            [value]="muted() ? 0 : volume()"
-            (input)="setVolume(+$any($event.target).value)"
-            aria-label="Volume"
-          />
-          <button type="button" class="txt" (click)="setVolume(1)" title="Maximum volume">Max</button>
-          <select (change)="setRate(+$any($event.target).value)" title="Playback speed">
-            @for (r of rates; track r) {
-              <option [value]="r" [selected]="r === rate()">{{ r }}×</option>
-            }
-          </select>
-          <button type="button" (click)="fullscreen()" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+          <span class="group volume">
+            <button type="button" (click)="toggleMute()" [title]="muted() || !volume() ? 'Unmute' : 'Mute'">
+              {{ muted() || !volume() ? '🔇' : volume() < 0.5 ? '🔉' : '🔊' }}
+            </button>
+            <button type="button" class="txt" (click)="setVolume(0)" title="Minimum volume">Min</button>
+            <input
+              class="vol"
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              [value]="muted() ? 0 : volume()"
+              (input)="setVolume(+$any($event.target).value)"
+              aria-label="Volume"
+            />
+            <button type="button" class="txt" (click)="setVolume(1)" title="Maximum volume">Max</button>
+          </span>
+          <span class="group">
+            <select (change)="setRate(+$any($event.target).value)" title="Playback speed">
+              @for (r of rates; track r) {
+                <option [value]="r" [selected]="r === rate()">{{ r }}×</option>
+              }
+            </select>
+            <button type="button" (click)="fullscreen()" title="Fullscreen" aria-label="Fullscreen">⛶</button>
+          </span>
         </div>
       </div>
     </div>
@@ -138,8 +142,19 @@ import { formatTime } from './video-ffmpeg';
     .spacer {
       flex: 1;
     }
+    /* Volume and speed/fullscreen each wrap as one unit on narrow screens. */
+    .group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .volume {
+      flex: 1 1 220px;
+      max-width: 260px;
+    }
     .vol {
-      width: 90px;
+      flex: 1;
+      min-width: 50px;
     }
   `,
 })
@@ -162,12 +177,15 @@ export class VideoPlayerComponent {
 
   constructor() {
     // A new source starts from the beginning, paused.
-    effect(() => {
-      this.src();
-      this.paused.set(true);
-      this.time.set(0);
-      this.duration.set(0);
-    }, { allowSignalWrites: true });
+    effect(
+      () => {
+        this.src();
+        this.paused.set(true);
+        this.time.set(0);
+        this.duration.set(0);
+      },
+      { allowSignalWrites: true },
+    );
   }
 
   /** Where the playhead is, in seconds. */

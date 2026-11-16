@@ -29,7 +29,8 @@ header h1 {
 
 main {
   display: grid;
-  grid-template-columns: 340px 1fr;
+  /* minmax(0, …) lets the columns shrink below their content's natural width. */
+  grid-template-columns: 340px minmax(0, 1fr);
   gap: 20px;
   flex: 1;
 }
@@ -40,11 +41,13 @@ main.wide {
 
 @media (max-width: 800px) {
   main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
+
 .panel {
+  min-width: 0;
   background: #fff;
   border: 1px solid #e3e6ea;
   border-radius: 12px;
@@ -128,6 +131,9 @@ main.wide {
 .field input[type='text'],
 .field input[type='number'],
 .field select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
   padding: 9px 10px;
   border: 1px solid #cfd5dc;
   border-radius: 8px;
@@ -504,4 +510,25 @@ button:disabled {
 
 .video-preview .empty {
   margin: auto;
+}
+
+/* Phones: 16px gutters, tighter panels, two-column tool tabs. Last, so it wins over .tabs. */
+@media (max-width: 600px) {
+  app-root {
+    padding: 16px;
+    gap: 16px;
+  }
+  .panel {
+    padding: 14px;
+  }
+  .preview {
+    min-height: 240px;
+  }
+  .tools {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tools button {
+    white-space: normal;
+  }
 }
