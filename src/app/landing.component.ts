@@ -1,7 +1,7 @@
 import { Component, output } from '@angular/core';
 
 /** The tools a landing card can open (same ids as AppComponent's Tool). */
-export type LandingTool = 'crop' | 'resize' | 'watermark' | 'combine' | 'pdf' | 'text';
+export type LandingTool = 'crop' | 'resize' | 'watermark' | 'combine' | 'pdf' | 'text' | 'video-crop' | 'video-merge';
 
 interface Card {
   tool: LandingTool;
@@ -28,7 +28,7 @@ interface Faq {
       <h1>Crop, resize &amp; compare — free, in your browser</h1>
       <p class="lead">
         Crop and rotate photos, reduce an image to 20 KB, 50 KB or 100 KB, watermark Aadhaar or PAN copies, merge
-        images into a PDF and compare two texts side by side. No sign-up, no limits.
+        images into a PDF, compare two texts side by side, and crop or merge videos. No sign-up, no limits.
       </p>
       <div class="hero-actions">
         <button type="button" class="primary" (click)="open.emit('resize')">Resize an image</button>
@@ -106,6 +106,18 @@ export class LandingComponent {
       icon: '🔍',
       title: 'Text compare',
       text: 'Paste or upload two texts and see every added, removed and changed line side by side.',
+    },
+    {
+      tool: 'video-crop',
+      icon: '🎬',
+      title: 'Video crop',
+      text: 'Keep just the part of a video between a start and an end time, and preview it before you download.',
+    },
+    {
+      tool: 'video-merge',
+      icon: '🎞️',
+      title: 'Video merge',
+      text: 'Join several videos — or your cropped clip and more — into one, in the order you choose.',
     },
   ];
 

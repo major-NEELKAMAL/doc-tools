@@ -9,6 +9,8 @@
     <button type="button" [class.active]="tool() === 'combine'" (click)="selectTool('combine')">Combine images</button>
     <button type="button" [class.active]="tool() === 'pdf'" (click)="selectTool('pdf')">Images to PDF</button>
     <button type="button" [class.active]="tool() === 'text'" (click)="selectTool('text')">Text compare</button>
+    <button type="button" [class.active]="tool() === 'video-crop'" (click)="selectTool('video-crop')">Video crop</button>
+    <button type="button" [class.active]="tool() === 'video-merge'" (click)="selectTool('video-merge')">Video merge</button>
   </nav>
   <p class="storage-note">
     A copy of each file you open is uploaded and kept in encrypted storage for 30 days.
@@ -22,6 +24,12 @@
 </main>
 <main [hidden]="tool() !== 'combine' && tool() !== 'pdf'">
   <app-image-combine [mode]="combineMode()" (send)="openFromCombine($event)" />
+</main>
+<main [hidden]="tool() !== 'video-crop'">
+  <app-video-trim (cropped)="croppedVideo.set($event)" (merge)="openTool('video-merge')" />
+</main>
+<main [hidden]="tool() !== 'video-merge'">
+  <app-video-merge [seed]="croppedVideo()" />
 </main>
 <!-- Crop, Resize and Watermark share one image, so it carries over between them. -->
 <main [hidden]="!isImageTool()">

@@ -9,12 +9,14 @@ import { Preview, replacePreview } from './preview';
 import { ResizeResult, ResizeType, imageSize, resizeImage } from './resize';
 import { LandingComponent } from './landing.component';
 import { TextCompareComponent } from './text-compare.component';
+import { VideoMergeComponent } from './video-merge.component';
+import { VideoTrimComponent } from './video-trim.component';
 import { WatermarkOptions, WatermarkService } from './watermark.service';
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
 
 export type ImageTool = 'crop' | 'resize' | 'watermark';
-export type Tool = ImageTool | CombineMode | 'text';
+export type Tool = ImageTool | CombineMode | 'text' | 'video-crop' | 'video-merge';
 
 /** Where the current image / result can be sent next. */
 const FORWARD_TARGETS: { id: ImageTool | CombineMode; label: string }[] = [
@@ -28,7 +30,7 @@ const FORWARD_TARGETS: { id: ImageTool | CombineMode; label: string }[] = [
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent, LandingComponent, TextCompareComponent],
+  imports: [FormsModule, ImageCombineComponent, ImageCropperComponent, LandingComponent, TextCompareComponent, VideoMergeComponent, VideoTrimComponent],
   templateUrl: './app.component.html',
 })
 export class AppComponent implements OnDestroy {
@@ -76,6 +78,8 @@ export class AppComponent implements OnDestroy {
   readonly editedSize = signal<{ width: number; height: number } | null>(null);
   readonly resized = signal<Preview | null>(null);
   readonly resizeInfo = signal<ResizeResult | null>(null);
+  /** The Video crop result, offered first in Video merge. */
+  readonly croppedVideo = signal<File | null>(null);
 
   private debounce?: ReturnType<typeof setTimeout>;
   private resizeDebounce?: ReturnType<typeof setTimeout>;
