@@ -9,7 +9,6 @@ import {
   formatSize,
   formatTime,
   isVideo,
-  parseTime,
   startTrim,
   uploadVideo,
   waitForJob,
@@ -64,30 +63,37 @@ interface Source {
           </div>
         }
         <p class="step">
-          Enter the part to keep — seconds or m:ss. Leave "Cut to" empty to keep everything to the end.
+          Choose the part to keep. Leave "Cut to" empty to keep everything to the end.
           @if (duration()) {
             The video is {{ fmt(duration()) }} long.
           }
         </p>
-        <div class="row">
-          <label class="field grow">
-            <span>Cut from</span>
-            <input type="text" inputmode="decimal" placeholder="0:00" [(ngModel)]="startText" />
-          </label>
-          <label class="field grow">
-            <span>Cut to</span>
-            <input
-              type="text"
-              inputmode="decimal"
-              [placeholder]="duration() ? fmt(duration()) + ' (end)' : 'End of video'"
-              [(ngModel)]="endText"
-            />
-          </label>
-        </div>
-        <div class="row buttons">
-          <button type="button" class="secondary" (click)="useCurrent('start')">Cut from here</button>
-          <button type="button" class="secondary" (click)="useCurrent('end')">Cut to here</button>
-        </div>
+        @for (t of times; track t.key) {
+          <fieldset class="time">
+            <legend>{{ t.label }}</legend>
+            <div class="hms">
+              @for (u of units; track u.key) {
+                <label>
+                  <input
+                    type="number"
+                    min="0"
+                    [max]="u.key === 'h' ? null : 59"
+                    [step]="u.key === 's' ? 0.1 : 1"
+                    [attr.inputmode]="u.key === 's' ? 'decimal' : 'numeric'"
+                    [placeholder]="t.key === 'to' && duration() ? endParts()[u.key] : '0'"
+                    [(ngModel)]="t.value[u.key]"
+                    [attr.aria-label]="t.label + ' ' + u.label"
+                  />
+                  <small>{{ u.label }}</small>
+                </label>
+              }
+              <button type="button" class="secondary" (click)="useCurrent(t.key)">Use player time</button>
+            </div>
+            @if (t.key === 'to') {
+              <small class="hint-left">Empty = to the end of the video</small>
+            }
+          </fieldset>
+        }
         <label class="check">
           <input type="checkbox" [(ngModel)]="exact" />
           Exact cut (slower — re-encodes to MP4)
@@ -147,6 +153,55 @@ interface Source {
       color: #6b7280;
       text-align: center;
     }
+    .time {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      border: 0;
+      min-width: 0;
+    }
+    .time legend {
+      padding: 0;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      color: #374151;
+    }
+    .hms {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .hms label {
+      flex: 1 1 0;
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+      text-align: center;
+    }
+    .hms input {
+      width: 100%;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: 9px 6px;
+      border: 1px solid #cfd5dc;
+      border-radius: 8px;
+      font: inherit;
+      text-align: center;
+    }
+    .hms small,
+    .hint-left {
+      color: #6b7280;
+      font-size: 0.75rem;
+    }
+    .hms button {
+      flex: 1.4 1 0;
+      min-width: 0;
+      padding: 9px 6px;
+      font-size: 0.8rem;
+      white-space: normal;
+      line-height: 1.15;
+    }
     .upload-state {
       display: grid;
       gap: 6px;
@@ -163,8 +218,18 @@ export class VideoTrimComponent implements OnDestroy {
   readonly cropped = output<VideoResult | null>();
   readonly player = viewChild(VideoPlayerComponent);
 
-  startText = '';
-  endText = '';
+  /** Cut from / Cut to as hours, minutes, seconds (no colon to type on a phone keypad). */
+  readonly times: { key: 'from' | 'to'; label: string; value: Hms }[] = [
+    { key: 'from', label: 'Cut from', value: emptyHms() },
+    { key: 'to', label: 'Cut to', value: emptyHms() },
+  ];
+  readonly units: { key: keyof Hms; label: string }[] = [
+    { key: 'h', label: 'hr' },
+    { key: 'm', label: 'min' },
+    { key: 's', label: 'sec' },
+  ];
+  /** The video's length split up, shown as the "Cut to" placeholders. */
+  readonly endParts = computed(() => toHms(this.duration()));
   exact = false;
 
   readonly source = signal<Source | null>(null);
@@ -203,29 +268,29 @@ export class VideoTrimComponent implements OnDestroy {
     if (this.view() === 'original') this.duration.set(duration);
   }
 
-  useCurrent(which: 'start' | 'end'): void {
+  useCurrent(which: 'from' | 'to'): void {
     const v = this.player();
     if (!v || this.view() !== 'original') {
       this.error.set('Switch the player to the original video first.');
       return;
     }
-    const t = formatTime(v.currentTime);
-    if (which === 'start') this.startText = t;
-    else this.endText = t;
+    Object.assign(this.times.find((t) => t.key === which)!.value, toHms(v.currentTime));
     this.error.set('');
   }
 
   async crop(): Promise<void> {
     const src = this.source();
     if (!src || this.phase() !== 'idle') return;
-    const start = this.startText.trim() ? parseTime(this.startText) : 0;
-    // Empty "Cut to" = the end of the video. If the browser couldn't read the length (some .mkv files),
-    // ask for a day's worth: the server stops at the video's real end.
-    const end = this.endText.trim() ? parseTime(this.endText) : this.duration() || 24 * 3600;
-    if (isNaN(start) || isNaN(end)) {
-      this.error.set('Write times as seconds (90) or minutes:seconds (1:30).');
+    const from = fromHms(this.times[0].value);
+    const to = fromHms(this.times[1].value);
+    if (Number.isNaN(from) || Number.isNaN(to)) {
+      this.error.set('Minutes and seconds go from 0 to 59.');
       return;
     }
+    const start = from ?? 0;
+    // Empty "Cut to" = the end of the video. If the browser couldn't read the length (some .mkv files),
+    // ask for a day's worth: the server stops at the video's real end.
+    const end = to ?? (this.duration() || 24 * 3600);
     if (!(end > start)) {
       this.error.set('"Cut to" must be after "Cut from".');
       return;
@@ -294,8 +359,7 @@ export class VideoTrimComponent implements OnDestroy {
       return;
     }
     this.error.set('');
-    this.startText = '';
-    this.endText = '';
+    this.times.forEach((t) => (t.value = emptyHms()));
     const src: Source = { file, url: URL.createObjectURL(file), upload: Promise.resolve(''), abort: new AbortController() };
     this.setSource(src);
     this.startUpload(src);
@@ -331,4 +395,33 @@ export class VideoTrimComponent implements OnDestroy {
     this.result.set(null);
     this.cropped.emit(null);
   }
+}
+
+interface Hms {
+  h: number | null;
+  m: number | null;
+  s: number | null;
+}
+
+function emptyHms(): Hms {
+  return { h: null, m: null, s: null };
+}
+
+/** Seconds → whole hours and minutes, seconds to a tenth. */
+function toHms(sec: number): Hms {
+  const t = Math.max(0, Math.round(sec * 10) / 10);
+  const h = Math.floor(t / 3600);
+  const m = Math.floor((t % 3600) / 60);
+  return { h, m, s: Math.round((t - h * 3600 - m * 60) * 10) / 10 };
+}
+
+/** null when all three are empty, NaN when minutes or seconds are out of range. */
+function fromHms(v: Hms): number | null {
+  const empty = (x: number | null) => x === null || (x as unknown) === '';
+  if (empty(v.h) && empty(v.m) && empty(v.s)) return null;
+  const h = Number(v.h ?? 0);
+  const m = Number(v.m ?? 0);
+  const s = Number(v.s ?? 0);
+  if ([h, m, s].some((x) => !Number.isFinite(x) || x < 0) || m >= 60 || s >= 60) return NaN;
+  return h * 3600 + m * 60 + s;
 }

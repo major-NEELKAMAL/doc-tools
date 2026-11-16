@@ -118,13 +118,6 @@ export async function waitForJob(jobId: string, onProgress?: Progress, signal?: 
   }
 }
 
-/** "90", "1:30", "01:01:30.5" → seconds; NaN when it does not parse. */
-export function parseTime(text: string): number {
-  const parts = text.trim().split(':');
-  if (!text.trim() || parts.length > 3 || parts.some((p) => !/^\d+(\.\d+)?$/.test(p))) return NaN;
-  return parts.reduce((s, p) => s * 60 + +p, 0);
-}
-
 /** Seconds → "m:ss.s" or "h:mm:ss.s". */
 export function formatTime(sec: number): string {
   const s = Math.max(0, sec);
